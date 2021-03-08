@@ -12,12 +12,18 @@ startTime = time.time()
 char = '\n' + ('*' * 70) + '\n'
 
 # Argparse Information
-parser = argparse.ArgumentParser(description='Phases a trio when gVCF files are available for each individual.')
+parser = argparse.ArgumentParser(description='Phases a trio when gVCF files are available for each individual. This program \
+    requires 14 GB of haplotype reference files and these files will automatically be downloaded when the program is first \
+    executed.')
 
 parser.add_argument('child_file', help='Sample (patient) File. Must be gzipped')
 parser.add_argument('paternal_file', help='Paternal File. Must be gzipped')
 parser.add_argument('maternal_file', help='Maternal File. Must be gzipped')
 parser.add_argument('output_file', help='Name and path of output file')
+parser.add_argument('haplotype_reference_files', help='The path where the haplotype reference files will be downloaded to.\
+    When using Docker, this path must be accessible by the container. If the folder you want these files downloaded to are not\
+    within the same path as you input files and/or outputfiles, you need to attach another volume to the Docker container\
+    so the folder can be accessed.')
 
 args = parser.parse_args()
 
@@ -26,6 +32,9 @@ childFile = args.child_file
 paternalFile = args.paternal_file
 maternalFile = args.maternal_file
 outputFile = args.output_file
+haplotypePath = args.haplotype_reference_files
+if not haplotypePath.endswith("/"):
+    haplotypePath = haplotypePath + "/"
 
 #Functions
 def relate_sample_name_to_file(file, title):
@@ -91,19 +100,9 @@ def filterParents(file):
     bgzipFile(tempOutput)
     print(f"Positions in {file} that correspond to variant-only positions of child have been output to temporary file.")
 
-# Download reference files if needed
-if not os.path.exists("fasta_reference_files/Homo_sapiens_assembly38.fasta"):
-    os.system("wget --no-check-certificate \
-    https://files.osf.io/v1/resources/3znuj/providers/osfstorage/5d9f54d2a7bc73000ee99fd6/?zip= -O /tmp/references.zip \
-    && unzip /tmp/references.zip -d /tmp/references \
-    && rm /tmp/references.zip \
-    && gzip -d /tmp/references/*.gz")
-    for file in glob.glob("/tmp/references/*"):
-        fileName = file.split("/")[-1]
-        if not os.path.exists(f"fasta_reference_files/{fileName}"):
-            os.system(f"mv {file} fasta_reference_files/")
-    os.system("chmod 777 fasta_reference_files/*")
-
+#Create a function to use to download files or phase
+def osSystemTask(task):
+    os.system(task)
 
 #Create a dictionary where the key is the family members title, and the value is the sample's ID in the VCF.
 sampleIds = {} #The dictionary that relate_sample_name_to_file() will use
@@ -113,15 +112,11 @@ relate_sample_name_to_file(maternalFile, "maternal")
 print(sampleIds)
 
 #Create a dictionary that has all the variant positions of the child, for each chromosome and output a file that has variant-only positions for the child
-
 positionDict = {} #The dictionary that filterChild() will use
 filterChild(childFile)
 print("Variant-only positions of the child have been written to a temporary file.")
 
-
 #Output a file for each parent that has positions that occur as variant-only positions in the child
-
-
 with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
     executor.map(filterParents, [paternalFile, maternalFile])
 
@@ -134,10 +129,13 @@ try:
     for file in files:
         fileString += f"-V {file} "
         os.system(f"gatk IndexFeatureFile -F {file}")
-    os.system(f"gatk CombineGVCFs -R fasta_reference_files/Homo_sapiens_assembly38.fasta {fileString} -O {tempCombinedName}")
+    # Extract fasta reference file
+    os.system("unzip /fasta_references.zip -d /fasta_references")
+    os.system("gzip -d /fasta_references/*.gz")
+    os.system(f"gatk CombineGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta {fileString} -O {tempCombinedName}")
     print("Trio has been combined and written to a temporary file.")
     os.system(f"gatk IndexFeatureFile -F {tempCombinedName}")
-    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R fasta_reference_files/Homo_sapiens_assembly38.fasta -V {tempCombinedName} -O {tempGenotypedName}")
+    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta -V {tempCombinedName} -O {tempGenotypedName}")
     print("Trio has been joint-genotyped.")
 
 except:
@@ -235,18 +233,27 @@ for file in fileListToBGzip:
     
 print("Trio has been separated into chromosome files and chromosome scaffolds have been created in preparation for phasing.")
 
-#Create a function to use to phase
-def phase(task):
-    os.system(task)
+# Extract genetic maps and download haplotype references if necessary
+os.system("tar -xf /shapeit4/maps/genetic_maps.b38.tar.gz -C /shapeit4/maps/")
+if not os.path.exists(f"{haplotypePath}ALL.chr1.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz"):
+    filesToDownload = []
+    for i in range(1,23):
+        filesToDownload.append(f"wget --no-check-certificate http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/release/20190312_biallelic_SNV_and_INDEL/ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz -P {haplotypePath}")
+    with concurrent.futures.ProcessPoolExecutor(max_workers=22) as executor:
+        executor.map(osSystemTask, filesToDownload)
+    filesToIndex = []
+    for i in range(1,23):
+        filesToIndex.append(f"bcftools index {haplotypePath}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz")
+    with concurrent.futures.ProcessPoolExecutor(max_workers=22) as executor:
+        executor.map(osSystemTask, filesToIndex)
 
 #Create a list of shapeit4 execution commands
 taskList = []
 for i in range(22, 0, -1):
-    taskList.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map genomic_maps/chr{i}.b38.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference haplotype_reference/ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --thread 2 --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
-
+    taskList.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b38.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotypePath}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
 #Phase with shapeit4, using concurrent.futures to phase all chromosomes at once.
 with concurrent.futures.ProcessPoolExecutor(max_workers=22) as executor:
-    executor.map(phase, taskList)
+    executor.map(osSystemTask, taskList)
 
 shapeitPositions = {}
 correctlyPhased = 0
@@ -418,7 +425,9 @@ with gzip.open(outputFile.replace(".gz", ""), "wb") as output:
 os.system(f"zcat {outputFile.replace('.gz', '')} | bgzip -f > {outputFile}")
 os.system(f"tabix -fp vcf {outputFile}")
 os.system(f"bcftools index {outputFile}")
+os.system(f"rm {outputFile.replace('.gz', '')}")
 print(f"Phased output file written as {outputFile}")
+
 #Print message and how long the previous steps took
 timeElapsedMinutes = round((time.time()-startTime) / 60, 2)
 timeElapsedHours = round(timeElapsedMinutes / 60, 2)
