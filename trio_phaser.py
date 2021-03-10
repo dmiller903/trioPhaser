@@ -24,6 +24,7 @@ parser.add_argument('haplotype_reference_files', help='The path where the haplot
     When using Docker, this path must be accessible by the container. If the folder you want these files downloaded to are not\
     within the same path as you input files and/or outputfiles, you need to attach another volume to the Docker container\
     so the folder can be accessed.')
+parser.add_argument('number_of_tasks', help='max number of cores that can be used in a given run.')
 
 args = parser.parse_args()
 
@@ -35,6 +36,7 @@ outputFile = args.output_file
 haplotypePath = args.haplotype_reference_files
 if not haplotypePath.endswith("/"):
     haplotypePath = haplotypePath + "/"
+numberTasks = int(args.number_of_tasks)
 
 #Functions
 def relate_sample_name_to_file(file, title):
@@ -117,7 +119,7 @@ filterChild(childFile)
 print("Variant-only positions of the child have been written to a temporary file.")
 
 #Output a file for each parent that has positions that occur as variant-only positions in the child
-with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
+with concurrent.futures.ProcessPoolExecutor(max_workers=numberTasks) as executor:
     executor.map(filterParents, [paternalFile, maternalFile])
 
 # Use GATK to combine all trios into one vcf and then genotype the combined trio vcf
@@ -135,7 +137,7 @@ try:
     os.system(f"gatk CombineGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta {fileString} -O {tempCombinedName}")
     print("Trio has been combined and written to a temporary file.")
     os.system(f"gatk IndexFeatureFile -F {tempCombinedName}")
-    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta -V {tempCombinedName} -O {tempGenotypedName}")
+    os.system(f"gatk --java-options '-Xmx2g' GenotypeGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta -V {tempCombinedName} -O {tempGenotypedName}")
     print("Trio has been joint-genotyped.")
 
 except:
@@ -239,12 +241,12 @@ if not os.path.exists(f"{haplotypePath}ALL.chr1.shapeit2_integrated_snvindels_v2
     filesToDownload = []
     for i in range(1,23):
         filesToDownload.append(f"wget --no-check-certificate http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/release/20190312_biallelic_SNV_and_INDEL/ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz -P {haplotypePath}")
-    with concurrent.futures.ProcessPoolExecutor(max_workers=22) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=numberTasks) as executor:
         executor.map(osSystemTask, filesToDownload)
     filesToIndex = []
     for i in range(1,23):
         filesToIndex.append(f"bcftools index {haplotypePath}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz")
-    with concurrent.futures.ProcessPoolExecutor(max_workers=22) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=numberTasks) as executor:
         executor.map(osSystemTask, filesToIndex)
 
 #Create a list of shapeit4 execution commands
@@ -252,7 +254,7 @@ taskList = []
 for i in range(22, 0, -1):
     taskList.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b38.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotypePath}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
 #Phase with shapeit4, using concurrent.futures to phase all chromosomes at once.
-with concurrent.futures.ProcessPoolExecutor(max_workers=22) as executor:
+with concurrent.futures.ProcessPoolExecutor(max_workers=numberTasks) as executor:
     executor.map(osSystemTask, taskList)
 
 shapeitPositions = {}
@@ -413,8 +415,8 @@ for i in range(1, 23):
                         shapeitPositions[chrom][pos] = line
 
 print(sampleIds)
-print(f"There are {correctlyPhased} ({(correctlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.2f}%) correctly phased haplotypes, and {incorrectlyPhased} ({(incorrectlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.2f}%) incorrectly phased haplotypes. {notInShapeit} variants were not phased by shapeit but were phasable and will be included in final output.")
-print(f"There were {totalVariants} total variants phased.")
+print(f"There were {correctlyPhased} ({(correctlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.2f}%) correctly phased haplotypes, and {incorrectlyPhased} ({(incorrectlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.2f}%) incorrectly phased haplotypes. {notInShapeit} variants were not phased by shapeit but were phasable and will be included in final output.")
+print(f"There were {totalVariants} total variants phased.\n")
 
 with gzip.open(outputFile.replace(".gz", ""), "wb") as output:
     output.write(header.encode())
