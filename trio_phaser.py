@@ -22,7 +22,7 @@ parser.add_argument('haplotype_reference_files', help='The path where the haplot
     When using Docker, this path must be accessible by the container. If the folder you want these files downloaded to are not\
     within the same path as you input files and/or outputfiles, you need to attach another volume to the Docker container\
     so the folder can be accessed.')
-parser.add_argument('number_of_tasks', help='max number of cores that can be used in a given run.')
+parser.add_argument('number_of_tasks', help='max number of cores that can be used in a given run.', default="22")
 
 args = parser.parse_args()
 
@@ -135,7 +135,7 @@ try:
     os.system(f"gatk CombineGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta {fileString} -O {tempCombinedName}")
     print("Trio has been combined and written to a temporary file.")
     os.system(f"gatk IndexFeatureFile -F {tempCombinedName}")
-    os.system(f"gatk --java-options '-Xmx2g' GenotypeGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta -V {tempCombinedName} -O {tempGenotypedName}")
+    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta -V {tempCombinedName} -O {tempGenotypedName}")
     print("Trio has been joint-genotyped.")
 
 except:
