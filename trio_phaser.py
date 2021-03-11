@@ -226,6 +226,7 @@ with gzip.open(tempGenotypedName, "rt") as vcf:
                     line = line.replace(childGenotype, phase)
                     scaffold.write(line.encode())
 
+#bgZip and index scaffold and chromosome files
 for file in fileListToBGzip:
     bgzipFile(file)
     os.system(f"tabix -fp vcf {file}.gz")
@@ -251,6 +252,7 @@ if not os.path.exists(f"{haplotypePath}ALL.chr1.shapeit2_integrated_snvindels_v2
 taskList = []
 for i in range(22, 0, -1):
     taskList.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b38.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotypePath}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
+
 #Phase with shapeit4, using concurrent.futures to phase all chromosomes at once.
 with concurrent.futures.ProcessPoolExecutor(max_workers=numberTasks) as executor:
     executor.map(osSystemTask, taskList)
@@ -429,18 +431,19 @@ for i in range(1, 23):
                         line = "\t".join(lineList) + "\n"
                         shapeitPositions[chrom][pos] = line
 
-
+#Print summary statistics
 print(f"\nThere were {correctlyPhased} ({(correctlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.5f}%) correctly phased haplotypes, and {incorrectlyPhased} ({(incorrectlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.5f}%) incorrectly phased haplotypes.")
 print(f"{notInShapeit} variants were not phased by shapeit but were phasable and will be included in final output.")
 print(f'{couldNotBeDetermined} phased variants (as phased by SHAPEIT4) could not be verified by using Mendelian inheritance alone.')
 print(f"There were {totalPhased} total variants phased.\n")
 
+#Output the final file
 with gzip.open(outputFile.replace(".gz", ""), "wb") as output:
     output.write(header.encode())
     for chrom, posDict in sorted(shapeitPositions.items()):
         for pos, line in sorted(posDict.items()):
             output.write(line.encode())
-
+#bgZip and index final file
 os.system(f"zcat {outputFile.replace('.gz', '')} | bgzip -f > {outputFile}")
 os.system(f"tabix -fp vcf {outputFile}")
 os.system(f"bcftools index {outputFile}")
