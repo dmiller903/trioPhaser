@@ -1,11 +1,9 @@
 # Import necessary modules
 import gzip
-import re
 import os
 import time
 import concurrent.futures
 import argparse
-import glob
 
 # Keep track of when the script began
 startTime = time.time()
@@ -257,13 +255,13 @@ for i in range(22, 0, -1):
 with concurrent.futures.ProcessPoolExecutor(max_workers=numberTasks) as executor:
     executor.map(osSystemTask, taskList)
 
+#Iterate through the phased file and determine if SHAPEIT4 phased the positions correctly that can be phased using Mendelian inheritance
 shapeitPositions = {}
 correctlyPhased = 0
 incorrectlyPhased = 0
 totalVariants = 0
-cannotBeDetermined = 0
-allHets = 0
 totalPhased = 0
+couldNotBeDetermined = 0
 header = ""
 for i in range(1, 23):
     with gzip.open(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz", "rt") as phasedFile:
@@ -286,6 +284,7 @@ for i in range(1, 23):
                     header = header + line
             else:
                 totalPhased += 1
+                totalVariants += 1
                 lineList = line.rstrip("\n").split("\t")
                 chrom = lineList[chromIndex]
                 pos = int(lineList[posIndex])
@@ -294,7 +293,6 @@ for i in range(1, 23):
                 maternalHaplotype = lineList[maternalIndex]
                 childAllele1 = childHaplotype[0]
                 childAllele2 = childHaplotype[-1]
-                totalVariants += 1
                 lineList[infoIndex] = "."
                 lineList[chromIndex] = "chr" + chrom
                 if chrom not in shapeitPositions:
@@ -332,7 +330,6 @@ for i in range(1, 23):
                         lineList[childIndex] = phase
                         line = "\t".join(lineList) + "\n"
                         shapeitPositions[chrom][pos] = line
-                        
                 elif childAllele2 in maternalHaplotype and childAllele2 not in paternalHaplotype and childAllele1 in paternalHaplotype:
                     phase = f"{childAllele1}|{childAllele2}"
                     if phase == childHaplotype:
@@ -344,10 +341,23 @@ for i in range(1, 23):
                         lineList[childIndex] = phase
                         line = "\t".join(lineList) + "\n"
                         shapeitPositions[chrom][pos] = line
+                elif childAllele1 == childAllele2 and childAllele1 in maternalHaplotype and childAllele1 in paternalHaplotype:
+                    phase = f"{childAllele1}|{childAllele2}"
+                    if phase == childHaplotype:
+                        correctlyPhased += 1
+                        line = "\t".join(lineList) + "\n"
+                        shapeitPositions[chrom][pos] = line
+                    else:
+                        incorrectlyPhased += 1
+                        lineList[childIndex] = phase
+                        line = "\t".join(lineList) + "\n"
+                        shapeitPositions[chrom][pos] = line
                 else:
+                    couldNotBeDetermined += 1
                     line = "\t".join(lineList) + "\n"
                     shapeitPositions[chrom][pos] = line
 
+#Iterate through the genotyped file and if the position was not phased by SHAPEIT4, determine if it's phasable and if it is, put it in the final output
 notInShapeit = 0
 for i in range(1, 23):
     with gzip.open(f"/tmp/genotyped_chr{i}.vcf.gz", "rt") as genotypeFile:
@@ -375,7 +385,6 @@ for i in range(1, 23):
                 maternalGenotype = lineList[maternalIndex].split(":")[0]
                 childAllele1 = childHaplotype[0]
                 childAllele2 = childHaplotype[-1]
-                
                 if pos not in shapeitPositions[chrom]:
                     totalVariants += 1
                     lineList[filterIndex] = "."
@@ -387,36 +396,44 @@ for i in range(1, 23):
                     if childAllele1 in paternalGenotype and childAllele1 not in maternalGenotype and childAllele2 in maternalGenotype:
                         phase = f"{childAllele1}|{childAllele2}"
                         notInShapeit += 1
+                        totalPhased += 1
                         lineList[childIndex] = phase
                         line = "\t".join(lineList) + "\n"
                         shapeitPositions[chrom][pos] = line
                     elif childAllele2 in paternalGenotype and childAllele2 not in maternalGenotype and childAllele1 in maternalGenotype:
                         phase = f"{childAllele2}|{childAllele1}"
                         notInShapeit += 1
+                        totalPhased += 1
                         lineList[childIndex] = phase
                         line = "\t".join(lineList) + "\n"
                         shapeitPositions[chrom][pos] = line
                     elif childAllele1 in maternalGenotype and childAllele1 not in paternalGenotype and childAllele2 in paternalGenotype:
                         phase = f"{childAllele2}|{childAllele1}"
                         notInShapeit += 1
+                        totalPhased += 1
                         lineList[childIndex] = phase
                         line = "\t".join(lineList) + "\n"
                         shapeitPositions[chrom][pos] = line
                     elif childAllele2 in maternalGenotype and childAllele2 not in paternalGenotype and childAllele1 in paternalGenotype:
                         phase = f"{childAllele1}|{childAllele2}"
                         notInShapeit += 1
+                        totalPhased += 1
                         lineList[childIndex] = phase
                         line = "\t".join(lineList) + "\n"
                         shapeitPositions[chrom][pos] = line
                     elif childAllele1 == childAllele2 and (childAllele1 in paternalGenotype and childAllele1 in maternalGenotype):
                         phase = f"{childAllele1}|{childAllele2}"
+                        notInShapeit += 1
+                        totalPhased += 1
                         lineList[childIndex] = phase
                         line = "\t".join(lineList) + "\n"
                         shapeitPositions[chrom][pos] = line
 
-print(sampleIds)
-print(f"There were {correctlyPhased} ({(correctlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.2f}%) correctly phased haplotypes, and {incorrectlyPhased} ({(incorrectlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.2f}%) incorrectly phased haplotypes. {notInShapeit} variants were not phased by shapeit but were phasable and will be included in final output.")
-print(f"There were {totalVariants} total variants phased.\n")
+
+print(f"\nThere were {correctlyPhased} ({(correctlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.5f}%) correctly phased haplotypes, and {incorrectlyPhased} ({(incorrectlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.5f}%) incorrectly phased haplotypes.")
+print(f"{notInShapeit} variants were not phased by shapeit but were phasable and will be included in final output.")
+print(f'{couldNotBeDetermined} phased variants (as phased by SHAPEIT4) could not be verified by using Mendelian inheritance alone.')
+print(f"There were {totalPhased} total variants phased.\n")
 
 with gzip.open(outputFile.replace(".gz", ""), "wb") as output:
     output.write(header.encode())
@@ -428,7 +445,7 @@ os.system(f"zcat {outputFile.replace('.gz', '')} | bgzip -f > {outputFile}")
 os.system(f"tabix -fp vcf {outputFile}")
 os.system(f"bcftools index {outputFile}")
 os.system(f"rm {outputFile.replace('.gz', '')}")
-print(f"Phased output file written as {outputFile}")
+print(f"\nPhased output file written as {outputFile}\n")
 
 #Print message and how long the previous steps took
 timeElapsedMinutes = round((time.time()-startTime) / 60, 2)
