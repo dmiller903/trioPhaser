@@ -6,7 +6,7 @@ import concurrent.futures
 import argparse
 
 # Keep track of when the script began
-startTime = time.time()
+start_time = time.time()
 char = '\n' + ('*' * 70) + '\n'
 
 # Argparse Information
@@ -18,439 +18,492 @@ parser.add_argument('child_file', help='Sample (patient) File. Must be gzipped')
 parser.add_argument('paternal_file', help='Paternal File. Must be gzipped')
 parser.add_argument('maternal_file', help='Maternal File. Must be gzipped')
 parser.add_argument('output_file', help='Name and path of output file')
-parser.add_argument('haplotype_reference_files', help='The path where the haplotype reference files will be downloaded to.\
+parser.add_argument('haplotype_reference_files', help='The path where the haplotype reference files will be/were downloaded to.\
     When using Docker, this path must be accessible by the container. If the folder you want these files downloaded to are not\
-    within the same path as you input files and/or outputfiles, you need to attach another volume to the Docker container\
+    within the same path as you input files and/or output_files, you need to attach another volume to the Docker container\
     so the folder can be accessed.')
-parser.add_argument('number_of_tasks', help='max number of cores that can be used in a given run.', default="22")
+parser.add_argument('number_of_tasks', help='Max number of cores that can be used in a given run.', default="1")
 
 args = parser.parse_args()
 
-#Create variables of each argument from argparse
-childFile = args.child_file
-paternalFile = args.paternal_file
-maternalFile = args.maternal_file
-outputFile = args.output_file
-haplotypePath = args.haplotype_reference_files
-if not haplotypePath.endswith("/"):
-    haplotypePath = haplotypePath + "/"
-numberTasks = int(args.number_of_tasks)
+# Create variables of each argument from argparse
+child_file = args.child_file
+paternal_file = args.paternal_file
+maternal_file = args.maternal_file
+output_file = args.output_file
+haplotype_path = args.haplotype_reference_files
+if not haplotype_path.endswith("/"):
+    haplotype_path = haplotype_path + "/"
+number_tasks = int(args.number_of_tasks)
 
-#Functions
+# Functions
 def relate_sample_name_to_file(file, title):
+    """This function gives each input file a title of "child", "maternal", or
+    paternal.
+    """
     with gzip.open(file, 'rt') as gVCF:
         for line in gVCF:
             if line.startswith('##'):
                 continue
             elif line.startswith("#CHROM"):
-                lineList = line.rstrip("\n").split("\t")
-                sampleId = lineList[-1]
-                sampleIds[title] = sampleId
+                line_list = line.rstrip("\n").split("\t")
+                sample_id = line_list[-1]
+                sample_ids[title] = sample_id
                 break
 
-def bgzipFile(file):
+def bgzip_file(file):
     os.system(f"zcat {file} | bgzip -f > {file}.gz")
     os.system(f"rm {file}")
 
-#Filter child file, remove  variants-only sites, create a dictionary of variant-only sites
-def filterChild(file):
-    tempOutput = "/tmp/child_parsed.vcf"
-    with gzip.open(file, 'rt') as gVCF, gzip.open(tempOutput, 'wb') as parsed:
+def filter_child(file):
+    """Filter child file, remove  variants-only sites, and create a dictionary 
+    of variant-only sites.
+    """
+    temp_output = "/tmp/child_parsed.vcf"
+    with gzip.open(file, 'rt') as gVCF, gzip.open(temp_output, 'wb') as parsed:
         for line in gVCF:
             if line.startswith('##'):
                 parsed.write(line.encode())
             elif line.startswith("#CHROM"):
-                lineList = line.rstrip("\n").split("\t")
-                chromIndex = lineList.index("#CHROM")
-                posIndex = lineList.index("POS")
+                line_list = line.rstrip("\n").split("\t")
+                chrom_index = line_list.index("#CHROM")
+                pos_index = line_list.index("POS")
                 parsed.write(line.encode())
             elif "END" not in line:
-                lineList = line.rstrip("\n").split("\t")
-                chrom = lineList[chromIndex]
-                pos = lineList[posIndex]
-                if chrom not in positionDict and chrom[3:].isnumeric() and int(chrom[3:]) in range(1, 23):
-                    positionDict[chrom] = {pos}
+                line_list = line.rstrip("\n").split("\t")
+                chrom = line_list[chrom_index]
+                pos = line_list[pos_index]
+                if chrom not in position_dict and chrom[3:].isnumeric() and int(chrom[3:]) in range(1, 23):
+                    position_dict[chrom] = {pos}
                     parsed.write(line.encode())
-                elif chrom in positionDict:
-                    positionDict[chrom].add(pos)
+                elif chrom in position_dict:
+                    position_dict[chrom].add(pos)
                     parsed.write(line.encode())
-    bgzipFile(tempOutput)
+    bgzip_file(temp_output)
 
-#Filter each parent file for sites that occur in sample of that family
-def filterParents(file):
-    if file == paternalFile:
-        tempOutput = f"/tmp/paternal_parsed.vcf"
-    elif file == maternalFile:
-        tempOutput = f"/tmp/maternal_parsed.vcf"
-    with gzip.open(file, 'rt') as gVCF, gzip.open(tempOutput, 'wb') as parsed:
+def filter_parents(file):
+    """Filter each parent file for sites that occur as variants in the child of 
+    that family.
+    """
+    if file == paternal_file:
+        temp_output = f"/tmp/paternal_parsed.vcf"
+    elif file == maternal_file:
+        temp_output = f"/tmp/maternal_parsed.vcf"
+    with gzip.open(file, 'rt') as gVCF, gzip.open(temp_output, 'wb') as parsed:
         for line in gVCF:
             if line.startswith("#"):
                 parsed.write(line.encode())
             else:
-                lineList = line.split("\t")
-                chrom = lineList[0]
-                pos = lineList[1]
-                if chrom in positionDict and pos in positionDict[chrom]:
+                line_list = line.split("\t")
+                chrom = line_list[0]
+                pos = line_list[1]
+                if chrom in position_dict and pos in position_dict[chrom]:
                     parsed.write(line.encode())
-                elif chrom in positionDict and pos not in positionDict[chrom]:
+                elif chrom in position_dict and pos not in position_dict[chrom]:
                     if "END" in line:
-                        for i in range(int(pos), int(lineList[7].lstrip("END=")) + 1):
-                            if str(i) in positionDict[chrom]:
+                        for i in range(int(pos), int(line_list[7].lstrip("END=")) + 1):
+                            if str(i) in position_dict[chrom]:
                                 parsed.write(line.encode())
-    bgzipFile(tempOutput)
+    bgzip_file(temp_output)
     print(f"Positions in {file} that correspond to variant-only positions of child have been output to temporary file.")
 
-#Create a function to use to download files or phase
-def osSystemTask(task):
+def os_system_task(task):
+    """Function is used to download files or phase at various times throughout
+    the process.
+    """
     os.system(task)
 
-#Create a dictionary where the key is the family members title, and the value is the sample's ID in the VCF.
-sampleIds = {} #The dictionary that relate_sample_name_to_file() will use
-relate_sample_name_to_file(childFile, "child")
-relate_sample_name_to_file(paternalFile, "paternal")
-relate_sample_name_to_file(maternalFile, "maternal")
-print(sampleIds)
+# Create a dictionary where the key is the family members title, and the value is the sample's ID in the VCF.
+sample_ids = {} #The dictionary that relate_sample_name_to_file() will use
+relate_sample_name_to_file(child_file, "child")
+relate_sample_name_to_file(paternal_file, "paternal")
+relate_sample_name_to_file(maternal_file, "maternal")
 
-#Create a dictionary that has all the variant positions of the child, for each chromosome and output a file that has variant-only positions for the child
-positionDict = {} #The dictionary that filterChild() will use
-filterChild(childFile)
+# Create a dictionary that has all the variant positions of the child, for each 
+# chromosome and output a file that has variant-only positions for the child
+position_dict = {} #The dictionary that filter_child() will use
+filter_child(child_file)
 print("Variant-only positions of the child have been written to a temporary file.")
 
-#Output a file for each parent that has positions that occur as variant-only positions in the child
-with concurrent.futures.ProcessPoolExecutor(max_workers=numberTasks) as executor:
-    executor.map(filterParents, [paternalFile, maternalFile])
+# Output a temporary file for each parent that has positions that occur as variant-only positions in the child
+with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) as executor:
+    executor.map(filter_parents, [paternal_file, maternal_file])
 
-# Use GATK to combine all trios into one vcf and then genotype the combined trio vcf
+# Use GATK to combine all trios into one temporary vcf and then genotype the combined trio vcf
 files = ["/tmp/child_parsed.vcf.gz", "/tmp/paternal_parsed.vcf.gz", "/tmp/maternal_parsed.vcf.gz"]
-tempCombinedName = "/tmp/combined.vcf.gz"
-tempGenotypedName = "/tmp/genotyped.vcf.gz"
+temp_combined_name = "/tmp/combined.vcf.gz"
+temp_genotyped_name = "/tmp/genotyped.vcf.gz"
 try:
-    fileString = ""
+    file_string = ""
     for file in files:
-        fileString += f"-V {file} "
+        file_string += f"-V {file} "
         os.system(f"gatk IndexFeatureFile -F {file}")
     # Extract fasta reference file
     os.system("unzip /fasta_references.zip -d /fasta_references")
     os.system("gzip -d /fasta_references/*.gz")
-    os.system(f"gatk CombineGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta {fileString} -O {tempCombinedName}")
+    os.system(f"gatk CombineGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta {file_string} -O {temp_combined_name}")
     print("Trio has been combined and written to a temporary file.")
-    os.system(f"gatk IndexFeatureFile -F {tempCombinedName}")
-    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta -V {tempCombinedName} -O {tempGenotypedName}")
+    os.system(f"gatk IndexFeatureFile -F {temp_combined_name}")
+    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta -V {temp_combined_name} -O {temp_genotyped_name}")
     print("Trio has been joint-genotyped.")
 
 except:
     print("Trio not combined, there was an error detected by GATK")
 
-#Separate combined trio file by chromosome and create child scaffold
-with gzip.open(tempGenotypedName, "rt") as vcf:
-    outputName = f"/tmp/genotyped"
-    chromosomeSet = set()
-    headerChromosome = ""
-    headerScaffold = ""
-    fileListToBGzip = []
+# Separate combined trio file by chromosome and create child scaffold 
+# (phased VCF) for each chromosome
+with gzip.open(temp_genotyped_name, "rt") as vcf:
+    output_name = f"/tmp/genotyped"
+    chromosome_set = set()
+    header_chromosome = ""
+    header_scaffold = ""
+    file_list_to_bgzip = []
     for line in vcf:
         if line.startswith("##"):
-            headerChromosome = headerChromosome + line
-            headerScaffold = headerScaffold + line
+            header_chromosome = header_chromosome + line
+            header_scaffold = header_scaffold + line
         elif line.startswith("#CHROM"):
-            headerChromosome = headerChromosome + line
-            lineList = line.rstrip("\n").split("\t")
-            chromIndex = lineList.index("#CHROM")
-            childIndex = lineList.index(sampleIds["child"])
-            paternalIndex = lineList.index(sampleIds["paternal"])
-            maternalIndex = lineList.index(sampleIds["maternal"])
-            newLineList = []
-            for i in range(0, len(lineList)):
-                if i != maternalIndex or i != paternalIndex:
-                    newLineList.append(lineList[i])
-            lineList = newLineList
-            line = "\t".join(lineList) + "\n"
-            headerScaffold = headerScaffold + line
-        elif not line.startswith("#") and line.split("\t")[0] not in chromosomeSet:
-            lineList = line.rstrip("\n").split("\t")
-            chrom = lineList[chromIndex]
-            updatedChrom = chrom[3:]
-            line = line.replace(chrom, updatedChrom)
-            #output metadata to output chromosome and output scaffold
-            with gzip.open(f"{outputName}_{chrom}.vcf", "wb") as chromosome, gzip.open(f"{outputName}_{chrom}_scaffold.vcf", "wb") as scaffold:
-                chromosome.write(headerChromosome.encode())
+            header_chromosome = header_chromosome + line
+            line_list = line.rstrip("\n").split("\t")
+            chrom_index = line_list.index("#CHROM")
+            child_index = line_list.index(sample_ids["child"])
+            paternal_index = line_list.index(sample_ids["paternal"])
+            maternal_index = line_list.index(sample_ids["maternal"])
+            # Recreate the header line with all columns except parental columns
+            new_line_list = []
+            for i in range(0, len(line_list)):
+                if i != maternal_index or i != paternal_index:
+                    new_line_list.append(line_list[i])
+            line_list = new_line_list
+            line = "\t".join(line_list) + "\n"
+            header_scaffold = header_scaffold + line
+        elif not line.startswith("#") and line.split("\t")[0] not in chromosome_set:
+            line_list = line.rstrip("\n").split("\t")
+            chrom = line_list[chrom_index]
+            # Chromosomes are listed as "chr1", this removes the "chr"
+            updated_chrom = chrom[3:]
+            line = line.replace(chrom, updated_chrom)
+            # output metadata to output chromosome and output scaffold
+            with gzip.open(f"{output_name}_{chrom}.vcf", "wb") as chromosome, \
+                gzip.open(f"{output_name}_{chrom}_scaffold.vcf", "wb") as scaffold:
+                chromosome.write(header_chromosome.encode())
                 chromosome.write(line.encode())
-                newLineList = []
-                for i in range(0, len(lineList)):
-                    if i != maternalIndex or i != paternalIndex:
-                        newLineList.append(lineList[i])
-                lineList = newLineList
-                line = "\t".join(lineList) + "\n"
-                line = line.replace(chrom, updatedChrom)
-                scaffold.write(headerScaffold.encode())
+                new_line_list = []
+                for i in range(0, len(line_list)):
+                    if i != maternal_index or i != paternal_index:
+                        new_line_list.append(line_list[i])
+                line_list = new_line_list
+                line = "\t".join(line_list) + "\n"
+                line = line.replace(chrom, updated_chrom)
+                scaffold.write(header_scaffold.encode())
                 scaffold.write(line.encode())
-                chromosomeSet.add(chrom)
-                fileListToBGzip.append(f"{outputName}_{chrom}.vcf")
-                fileListToBGzip.append(f"{outputName}_{chrom}_scaffold.vcf")
-        elif not line.startswith("#") and line.split("\t")[0] in chromosomeSet:
-            lineList = line.rstrip("\n").split("\t")
-            chrom = lineList[chromIndex]
-            updatedChrom = chrom[3:]
-            childGenotype = lineList[childIndex].split(":")[0]
-            paternalGenotype = lineList[paternalIndex].split(":")[0]
-            maternalGenotype = lineList[maternalIndex].split(":")[0]
-            childAllele1 = childGenotype[0]
-            childAllele2 = childGenotype[-1]
-            line = line.replace(chrom, updatedChrom)
-            #Output line to chromosome file
-            with gzip.open(f"{outputName}_{chrom}.vcf", "ab") as chromosome:
+                chromosome_set.add(chrom)
+                file_list_to_bgzip.append(f"{output_name}_{chrom}.vcf")
+                file_list_to_bgzip.append(f"{output_name}_{chrom}_scaffold.vcf")
+        elif not line.startswith("#") and line.split("\t")[0] in chromosome_set:
+            line_list = line.rstrip("\n").split("\t")
+            chrom = line_list[chrom_index]
+            updated_chrom = chrom[3:]
+            child_genotype = line_list[child_index].split(":")[0]
+            paternal_genotype = line_list[paternal_index].split(":")[0]
+            maternal_genotype = line_list[maternal_index].split(":")[0]
+            child_allele_1 = child_genotype[0]
+            child_allele_2 = child_genotype[-1]
+            line = line.replace(chrom, updated_chrom)
+            # Output line to chromosome file
+            with gzip.open(f"{output_name}_{chrom}.vcf", "ab") as chromosome:
                 chromosome.write(line.encode())
-            #Output line (except for parent genotypes) for trio-phased lines
-            with gzip.open(f"{outputName}_{chrom}_scaffold.vcf", "ab") as scaffold:
-                newLineList = []
-                for i in range(0, len(lineList)):
-                    if i != maternalIndex or i != paternalIndex:
-                        newLineList.append(lineList[i])
-                lineList = newLineList
-                line = "\t".join(lineList) + "\n"
-                line = line.replace(chrom, updatedChrom)
-                if childAllele1 in paternalGenotype and childAllele1 not in maternalGenotype and childAllele2 in maternalGenotype:
-                    phase = f"{childAllele1}|{childAllele2}"
-                    line = line.replace(childGenotype, phase)
+            # Phase child using Mendelian inheritance, output haplotype to 
+            # scaffold file
+            with gzip.open(f"{output_name}_{chrom}_scaffold.vcf", "ab") as scaffold:
+                new_line_list = []
+                for i in range(0, len(line_list)):
+                    if i != maternal_index or i != paternal_index:
+                        new_line_list.append(line_list[i])
+                line_list = new_line_list
+                line = "\t".join(line_list) + "\n"
+                line = line.replace(chrom, updated_chrom)
+                # This if and elif section phases the child using Mendelian 
+                # inheritance and lists paternal nucleotide first, and the 
+                # maternal nucleotide second.
+                if child_allele_1 in paternal_genotype \
+                    and child_allele_1 not in maternal_genotype \
+                    and child_allele_2 in maternal_genotype:
+                    phase = f"{child_allele_1}|{child_allele_2}"
+                    line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
-                elif childAllele2 in paternalGenotype and childAllele2 not in maternalGenotype and childAllele1 in maternalGenotype:
-                    phase = f"{childAllele2}|{childAllele1}"
-                    line = line.replace(childGenotype, phase)
+                elif child_allele_2 in paternal_genotype \
+                    and child_allele_2 not in maternal_genotype \
+                    and child_allele_1 in maternal_genotype:
+                    phase = f"{child_allele_2}|{child_allele_1}"
+                    line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
-                elif childAllele1 in maternalGenotype and childAllele1 not in paternalGenotype and childAllele2 in paternalGenotype:
-                    phase = f"{childAllele2}|{childAllele1}"
-                    line = line.replace(childGenotype, phase)
+                elif child_allele_1 in maternal_genotype \
+                    and child_allele_1 not in paternal_genotype \
+                    and child_allele_2 in paternal_genotype:
+                    phase = f"{child_allele_2}|{child_allele_1}"
+                    line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
-                elif childAllele2 in maternalGenotype and childAllele2 not in paternalGenotype and childAllele1 in paternalGenotype:
-                    phase = f"{childAllele1}|{childAllele2}"
-                    line = line.replace(childGenotype, phase)
+                elif child_allele_2 in maternal_genotype \
+                    and child_allele_2 not in paternal_genotype \
+                    and child_allele_1 in paternal_genotype:
+                    phase = f"{child_allele_1}|{child_allele_2}"
+                    line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
 
-#bgZip and index scaffold and chromosome files
-for file in fileListToBGzip:
-    bgzipFile(file)
+# bgZip and index scaffold and chromosome files
+for file in file_list_to_bgzip:
+    bgzip_file(file)
     os.system(f"tabix -fp vcf {file}.gz")
     os.system(f"bcftools index {file}.gz")
     
-print("Trio has been separated into chromosome files and chromosome scaffolds have been created in preparation for phasing.")
+print(
+    "Trio has been separated into chromosome files and chromosome "
+    "scaffolds have been created in preparation for phasing.")
 
 # Extract genetic maps and download haplotype references if necessary
 os.system("tar -xf /shapeit4/maps/genetic_maps.b38.tar.gz -C /shapeit4/maps/")
-if not os.path.exists(f"{haplotypePath}ALL.chr1.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz"):
-    filesToDownload = []
+if not os.path.exists(f"{haplotype_path}ALL.chr1.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz"):
+    files_to_download = []
     for i in range(1,23):
-        filesToDownload.append(f"wget --no-check-certificate http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/release/20190312_biallelic_SNV_and_INDEL/ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz -P {haplotypePath}")
-    with concurrent.futures.ProcessPoolExecutor(max_workers=numberTasks) as executor:
-        executor.map(osSystemTask, filesToDownload)
+        files_to_download.append(f"wget --no-check-certificate http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/release/20190312_biallelic_SNV_and_INDEL/ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz -P {haplotype_path}")
+    with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) as executor:
+        executor.map(os_system_task, files_to_download)
     filesToIndex = []
     for i in range(1,23):
-        filesToIndex.append(f"bcftools index {haplotypePath}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz")
-    with concurrent.futures.ProcessPoolExecutor(max_workers=numberTasks) as executor:
-        executor.map(osSystemTask, filesToIndex)
+        filesToIndex.append(f"bcftools index {haplotype_path}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz")
+    with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) as executor:
+        executor.map(os_system_task, filesToIndex)
 
-#Create a list of shapeit4 execution commands
-taskList = []
+# Create a list of shapeit4 execution commands.
+task_list = []
 for i in range(22, 0, -1):
-    taskList.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b38.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotypePath}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
+    task_list.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b38.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotype_path}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
 
-#Phase with shapeit4, using concurrent.futures to phase all chromosomes at once.
-with concurrent.futures.ProcessPoolExecutor(max_workers=numberTasks) as executor:
-    executor.map(osSystemTask, taskList)
+# Phase with shapeit4, using concurrent.futures to phase all chromosomes at once.
+with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) as executor:
+    executor.map(os_system_task, task_list)
 
-#Iterate through the phased file and determine if SHAPEIT4 phased the positions correctly that can be phased using Mendelian inheritance
-shapeitPositions = {}
-correctlyPhased = 0
-incorrectlyPhased = 0
-totalVariants = 0
-totalPhased = 0
-couldNotBeDetermined = 0
+# Iterate through the phased file and determine if SHAPEIT4 phased the 
+# positions correctly that can be phased using Mendelian inheritance.
+shapeit_positions = {}
+correctly_phased = 0
+incorrectly_phased = 0
+total_variants = 0
+total_phased = 0
+could_not_be_determined = 0
 header = ""
 for i in range(1, 23):
     with gzip.open(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz", "rt") as phasedFile:
-        iteration = 0
         for line in phasedFile:
             if line.startswith("##"):
                 if i == 1:
                     header = header + line
             elif line.startswith("#CHROM"):
-                lineList = line.rstrip("\n").split("\t")
-                childIndex = lineList.index(sampleIds["child"])
-                paternalIndex = lineList.index(sampleIds["paternal"])
-                maternalIndex = lineList.index(sampleIds["maternal"])
-                posIndex = lineList.index("POS")
-                chromIndex = lineList.index("#CHROM")
-                refIndex = lineList.index("REF")
-                altIndex = lineList.index("ALT")
-                infoIndex = lineList.index("INFO")
+                line_list = line.rstrip("\n").split("\t")
+                child_index = line_list.index(sample_ids["child"])
+                paternal_index = line_list.index(sample_ids["paternal"])
+                maternal_index = line_list.index(sample_ids["maternal"])
+                pos_index = line_list.index("POS")
+                chrom_index = line_list.index("#CHROM")
+                info_index = line_list.index("INFO")
                 if i == 1:
                     header = header + line
             else:
-                totalPhased += 1
-                totalVariants += 1
-                lineList = line.rstrip("\n").split("\t")
-                chrom = lineList[chromIndex]
-                pos = int(lineList[posIndex])
-                childHaplotype = lineList[childIndex]
-                paternalHaplotype = lineList[paternalIndex]
-                maternalHaplotype = lineList[maternalIndex]
-                childAllele1 = childHaplotype[0]
-                childAllele2 = childHaplotype[-1]
-                lineList[infoIndex] = "."
-                lineList[chromIndex] = "chr" + chrom
-                if chrom not in shapeitPositions:
-                    shapeitPositions[chrom] = {}
-                if childAllele1 in paternalHaplotype and childAllele1 not in maternalHaplotype and childAllele2 in maternalHaplotype:
-                    phase = f"{childAllele1}|{childAllele2}"
-                    if phase == childHaplotype:
-                        correctlyPhased += 1
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                    else:
-                        incorrectlyPhased += 1
-                        lineList[childIndex] = phase
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                elif childAllele2 in paternalHaplotype and childAllele2 not in maternalHaplotype and childAllele1 in maternalHaplotype:
-                    phase = f"{childAllele2}|{childAllele1}"
-                    if phase == childHaplotype:
-                        correctlyPhased += 1
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                    else:
-                        incorrectlyPhased += 1
-                        lineList[childIndex] = phase
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                elif childAllele1 in maternalHaplotype and childAllele1 not in paternalHaplotype and childAllele2 in paternalHaplotype:
-                    phase = f"{childAllele2}|{childAllele1}"
-                    if phase == childHaplotype:
-                        correctlyPhased += 1
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                    else:
-                        incorrectlyPhased += 1
-                        lineList[childIndex] = phase
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                elif childAllele2 in maternalHaplotype and childAllele2 not in paternalHaplotype and childAllele1 in paternalHaplotype:
-                    phase = f"{childAllele1}|{childAllele2}"
-                    if phase == childHaplotype:
-                        correctlyPhased += 1
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                    else:
-                        incorrectlyPhased += 1
-                        lineList[childIndex] = phase
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                elif childAllele1 == childAllele2 and childAllele1 in maternalHaplotype and childAllele1 in paternalHaplotype:
-                    phase = f"{childAllele1}|{childAllele2}"
-                    if phase == childHaplotype:
-                        correctlyPhased += 1
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                    else:
-                        incorrectlyPhased += 1
-                        lineList[childIndex] = phase
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                else:
-                    couldNotBeDetermined += 1
-                    line = "\t".join(lineList) + "\n"
-                    shapeitPositions[chrom][pos] = line
+                total_phased += 1
+                total_variants += 1
+                line_list = line.rstrip("\n").split("\t")
+                chrom = line_list[chrom_index]
+                pos = int(line_list[pos_index])
+                child_haplotype = line_list[child_index]
+                paternal_haplotype = line_list[paternal_index]
+                maternal_haplotype = line_list[maternal_index]
+                child_allele_1 = child_haplotype[0]
+                child_allele_2 = child_haplotype[-1]
+                line_list[info_index] = "."
+                line_list[chrom_index] = "chr" + chrom
 
-#Iterate through the genotyped file and if the position was not phased by SHAPEIT4, determine if it's phasable and if it is, put it in the final output
-notInShapeit = 0
+                if chrom not in shapeit_positions:
+                    shapeit_positions[chrom] = {}
+                # Checks if the "child_haplotype" (phased with SHAPEIT4) was
+                # correctly phased using Mendelian determined "phase".
+                if child_allele_1 in paternal_haplotype \
+                    and child_allele_1 not in maternal_haplotype \
+                    and child_allele_2 in maternal_haplotype:
+                    phase = f"{child_allele_1}|{child_allele_2}"
+                    if phase == child_haplotype:
+                        correctly_phased += 1
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    else:
+                        incorrectly_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                elif child_allele_2 in paternal_haplotype \
+                    and child_allele_2 not in maternal_haplotype \
+                    and child_allele_1 in maternal_haplotype:
+                    phase = f"{child_allele_2}|{child_allele_1}"
+                    if phase == child_haplotype:
+                        correctly_phased += 1
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    else:
+                        incorrectly_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                elif child_allele_1 in maternal_haplotype \
+                    and child_allele_1 not in paternal_haplotype \
+                    and child_allele_2 in paternal_haplotype:
+                    phase = f"{child_allele_2}|{child_allele_1}"
+                    if phase == child_haplotype:
+                        correctly_phased += 1
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    else:
+                        incorrectly_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                elif child_allele_2 in maternal_haplotype \
+                    and child_allele_2 not in paternal_haplotype \
+                    and child_allele_1 in paternal_haplotype:
+                    phase = f"{child_allele_1}|{child_allele_2}"
+                    if phase == child_haplotype:
+                        correctly_phased += 1
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    else:
+                        incorrectly_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                elif child_allele_1 == child_allele_2 \
+                    and child_allele_1 in maternal_haplotype \
+                    and child_allele_1 in paternal_haplotype:
+                    phase = f"{child_allele_1}|{child_allele_2}"
+                    if phase == child_haplotype:
+                        correctly_phased += 1
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    else:
+                        incorrectly_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                else:
+                    could_not_be_determined += 1
+                    line = "\t".join(line_list) + "\n"
+                    shapeit_positions[chrom][pos] = line
+
+# Iterate through the genotyped file and if the position was not phased by 
+# SHAPEIT4, determine if it's phasable and if it is, put it in the final output.
+not_in_shapeit = 0
 for i in range(1, 23):
     with gzip.open(f"/tmp/genotyped_chr{i}.vcf.gz", "rt") as genotypeFile:
         for line in genotypeFile:
             if line.startswith("##"):
                 continue
             elif line.startswith("#CHROM"):
-                lineList = line.rstrip("\n").split("\t")
-                childIndex = lineList.index(sampleIds["child"])
-                paternalIndex = lineList.index(sampleIds["paternal"])
-                maternalIndex = lineList.index(sampleIds["maternal"])
-                posIndex = lineList.index("POS")
-                chromIndex = lineList.index("#CHROM")
-                refIndex = lineList.index("REF")
-                altIndex = lineList.index("ALT")
-                filterIndex = lineList.index("FILTER")
-                infoIndex = lineList.index("INFO")
-                formatIndex = lineList.index("FORMAT")
+                line_list = line.rstrip("\n").split("\t")
+                child_index = line_list.index(sample_ids["child"])
+                paternal_index = line_list.index(sample_ids["paternal"])
+                maternal_index = line_list.index(sample_ids["maternal"])
+                pos_index = line_list.index("POS")
+                chrom_index = line_list.index("#CHROM")
+                filter_index = line_list.index("FILTER")
+                info_index = line_list.index("INFO")
+                format_index = line_list.index("FORMAT")
             else:
-                lineList = line.rstrip("\n").split("\t")
-                chrom = lineList[chromIndex]
-                pos = int(lineList[posIndex])
-                childHaplotype = lineList[childIndex].split(":")[0]
-                paternalGenotype = lineList[paternalIndex].split(":")[0]
-                maternalGenotype = lineList[maternalIndex].split(":")[0]
-                childAllele1 = childHaplotype[0]
-                childAllele2 = childHaplotype[-1]
-                if pos not in shapeitPositions[chrom]:
-                    totalVariants += 1
-                    lineList[filterIndex] = "."
-                    lineList[infoIndex] = "."
-                    lineList[formatIndex] = "GT"
-                    lineList[chromIndex] = "chr" + chrom
-                    lineList[paternalIndex] = paternalGenotype
-                    lineList[maternalIndex] = maternalGenotype
-                    if childAllele1 in paternalGenotype and childAllele1 not in maternalGenotype and childAllele2 in maternalGenotype:
-                        phase = f"{childAllele1}|{childAllele2}"
-                        notInShapeit += 1
-                        totalPhased += 1
-                        lineList[childIndex] = phase
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                    elif childAllele2 in paternalGenotype and childAllele2 not in maternalGenotype and childAllele1 in maternalGenotype:
-                        phase = f"{childAllele2}|{childAllele1}"
-                        notInShapeit += 1
-                        totalPhased += 1
-                        lineList[childIndex] = phase
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                    elif childAllele1 in maternalGenotype and childAllele1 not in paternalGenotype and childAllele2 in paternalGenotype:
-                        phase = f"{childAllele2}|{childAllele1}"
-                        notInShapeit += 1
-                        totalPhased += 1
-                        lineList[childIndex] = phase
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                    elif childAllele2 in maternalGenotype and childAllele2 not in paternalGenotype and childAllele1 in paternalGenotype:
-                        phase = f"{childAllele1}|{childAllele2}"
-                        notInShapeit += 1
-                        totalPhased += 1
-                        lineList[childIndex] = phase
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
-                    elif childAllele1 == childAllele2 and (childAllele1 in paternalGenotype and childAllele1 in maternalGenotype):
-                        phase = f"{childAllele1}|{childAllele2}"
-                        notInShapeit += 1
-                        totalPhased += 1
-                        lineList[childIndex] = phase
-                        line = "\t".join(lineList) + "\n"
-                        shapeitPositions[chrom][pos] = line
+                line_list = line.rstrip("\n").split("\t")
+                chrom = line_list[chrom_index]
+                pos = int(line_list[pos_index])
+                child_haplotype = line_list[child_index].split(":")[0]
+                paternal_genotype = line_list[paternal_index].split(":")[0]
+                maternal_genotype = line_list[maternal_index].split(":")[0]
+                child_allele_1 = child_haplotype[0]
+                child_allele_2 = child_haplotype[-1]
+                # If the position is not in the shapeit_positions dictionary, 
+                # then Mendelian inheritance logic is used to see if position 
+                # is phasable.
+                if pos not in shapeit_positions[chrom]:
+                    total_variants += 1
+                    line_list[filter_index] = "."
+                    line_list[info_index] = "."
+                    line_list[format_index] = "GT"
+                    line_list[chrom_index] = "chr" + chrom
+                    line_list[paternal_index] = paternal_genotype
+                    line_list[maternal_index] = maternal_genotype
+                    # Phase using Mendelian inheritance when able.
+                    if child_allele_1 in paternal_genotype \
+                        and child_allele_1 not in maternal_genotype \
+                        and child_allele_2 in maternal_genotype:
+                        phase = f"{child_allele_1}|{child_allele_2}"
+                        not_in_shapeit += 1
+                        total_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    elif child_allele_2 in paternal_genotype \
+                        and child_allele_2 not in maternal_genotype \
+                        and child_allele_1 in maternal_genotype:
+                        phase = f"{child_allele_2}|{child_allele_1}"
+                        not_in_shapeit += 1
+                        total_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    elif child_allele_1 in maternal_genotype \
+                        and child_allele_1 not in paternal_genotype \
+                        and child_allele_2 in paternal_genotype:
+                        phase = f"{child_allele_2}|{child_allele_1}"
+                        not_in_shapeit += 1
+                        total_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    elif child_allele_2 in maternal_genotype \
+                        and child_allele_2 not in paternal_genotype \
+                        and child_allele_1 in paternal_genotype:
+                        phase = f"{child_allele_1}|{child_allele_2}"
+                        not_in_shapeit += 1
+                        total_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    elif child_allele_1 == child_allele_2 \
+                        and (child_allele_1 in paternal_genotype \
+                        and child_allele_1 in maternal_genotype):
+                        phase = f"{child_allele_1}|{child_allele_2}"
+                        not_in_shapeit += 1
+                        total_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
 
-#Print summary statistics
-print(f"\nThere were {correctlyPhased} ({(correctlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.5f}%) correctly phased haplotypes, and {incorrectlyPhased} ({(incorrectlyPhased / (correctlyPhased + incorrectlyPhased)) * 100:.5f}%) incorrectly phased haplotypes.")
-print(f"{notInShapeit} variants were not phased by shapeit but were phasable and will be included in final output.")
-print(f'{couldNotBeDetermined} phased variants (as phased by SHAPEIT4) could not be verified by using Mendelian inheritance alone.')
-print(f"There were {totalPhased} total variants phased.\n")
+# Print summary statistics.
+print(f"\nThere were {correctly_phased} ({(correctly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) correctly phased haplotypes, and {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) incorrectly phased haplotypes.")
+print(f"{not_in_shapeit} variants were not phased by shapeit but were phasable and will be included in final output.")
+print(f'{could_not_be_determined} phased variants (as phased by SHAPEIT4) could not be verified by using Mendelian inheritance alone.')
+print(f"There were {total_phased} total variants phased.\n")
+print(f"There were {total_variants} total variants prior to any phasing.\n")
 
-#Output the final file
-with gzip.open(outputFile.replace(".gz", ""), "wb") as output:
+# Output the final file.
+with gzip.open(output_file.replace(".gz", ""), "wb") as output:
     output.write(header.encode())
-    for chrom, posDict in sorted(shapeitPositions.items()):
+    for chrom, posDict in sorted(shapeit_positions.items()):
         for pos, line in sorted(posDict.items()):
             output.write(line.encode())
-#bgZip and index final file
-os.system(f"zcat {outputFile.replace('.gz', '')} | bgzip -f > {outputFile}")
-os.system(f"tabix -fp vcf {outputFile}")
-os.system(f"bcftools index {outputFile}")
-os.system(f"rm {outputFile.replace('.gz', '')}")
-print(f"\nPhased output file written as {outputFile}\n")
 
-#Print message and how long the previous steps took
-timeElapsedMinutes = round((time.time()-startTime) / 60, 2)
+# bgZip and index final file.
+os.system(f"zcat {output_file.replace('.gz', '')} | bgzip -f > {output_file}")
+os.system(f"tabix -fp vcf {output_file}")
+os.system(f"bcftools index {output_file}")
+os.system(f"rm {output_file.replace('.gz', '')}")
+print(f"\nPhased output file written as {output_file}\n")
+
+# Print message and how long the previous steps took.
+timeElapsedMinutes = round((time.time()-start_time) / 60, 2)
 timeElapsedHours = round(timeElapsedMinutes / 60, 2)
 print(f'{char}Done. Time elapsed: {timeElapsedMinutes} minutes ({timeElapsedHours} hours) {char}')
