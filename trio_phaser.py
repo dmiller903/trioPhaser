@@ -10,19 +10,24 @@ start_time = time.time()
 char = '\n' + ('*' * 70) + '\n'
 
 # Argparse Information
-parser = argparse.ArgumentParser(description='Phases a trio when gVCF files are available for each individual. This program \
-    requires 14 GB of haplotype reference files and these files will automatically be downloaded when the program is first \
-    executed.')
-
+parser = argparse.ArgumentParser(description='Phases a trio when gVCF files are \
+    available for each individual. This program requires 14 GB of haplotype \
+    reference files and these files will automatically be downloaded when the \
+    program is first executed.')
 parser.add_argument('child_file', help='Sample (patient) File. Must be gzipped')
 parser.add_argument('paternal_file', help='Paternal File. Must be gzipped')
 parser.add_argument('maternal_file', help='Maternal File. Must be gzipped')
 parser.add_argument('output_file', help='Name and path of output file')
-parser.add_argument('haplotype_reference_files', help='The path where the haplotype reference files will be/were downloaded to.\
-    When using Docker, this path must be accessible by the container. If the folder you want these files downloaded to are not\
-    within the same path as you input files and/or output_files, you need to attach another volume to the Docker container\
-    so the folder can be accessed.')
-parser.add_argument('number_of_tasks', help='Max number of cores that can be used in a given run.', default="1")
+parser.add_argument('haplotype_reference_files', help='The path where the \
+    haplotype reference files will be/were downloaded to.\
+    When using Docker, this path must be accessible by the container. If the \
+    folder you want these files downloaded to are not within the same path as \
+    you input files and/or output_files, you need to attach another volume to \
+    the Docker container so the folder can be accessed.')
+parser.add_argument('number_of_tasks', help='Max number of cores that can be \
+    used in a given run. If 22 cores are availabe for use, all chromosomes will \
+    be phased by SHAPEIT4 at the same time, significantly speeding up the overall \
+    runtime.', default="2")
 
 args = parser.parse_args()
 
@@ -112,6 +117,41 @@ def os_system_task(task):
     the process.
     """
     os.system(task)
+
+def get_phase(child_allele_1, child_allele_2, 
+            paternal_genotype_or_haplotype, maternal_genotype_or_haplotype):
+    """Function is used to get the phase of the child, using the maternal and
+    paternal genotypes as a reference. The if and elif section phases the child 
+    using Mendelian inheritance and lists paternal nucleotide first, and the 
+    maternal nucleotide second.
+    """
+    if child_allele_1 in paternal_genotype_or_haplotype \
+        and child_allele_1 not in maternal_genotype_or_haplotype \
+        and ("." not in maternal_genotype_or_haplotype \
+        and "." not in paternal_genotype_or_haplotype):
+        phase = f"{child_allele_1}|{child_allele_2}"
+    elif child_allele_2 in paternal_genotype_or_haplotype \
+        and child_allele_2 not in maternal_genotype_or_haplotype \
+        and ("." not in maternal_genotype_or_haplotype \
+        and "." not in paternal_genotype_or_haplotype):
+        phase = f"{child_allele_2}|{child_allele_1}"
+    elif child_allele_1 in maternal_genotype_or_haplotype \
+        and child_allele_1 not in paternal_genotype_or_haplotype \
+        and ("." not in maternal_genotype_or_haplotype \
+        and "." not in paternal_genotype_or_haplotype):
+        phase = f"{child_allele_2}|{child_allele_1}"
+    elif child_allele_2 in maternal_genotype_or_haplotype \
+        and child_allele_2 not in paternal_genotype_or_haplotype \
+        and ("." not in maternal_genotype_or_haplotype \
+        and "." not in paternal_genotype_or_haplotype):
+        phase = f"{child_allele_1}|{child_allele_2}"
+    elif child_allele_1 == child_allele_2 \
+        and (child_allele_1 in maternal_genotype_or_haplotype \
+        and child_allele_1 in paternal_genotype_or_haplotype):
+        phase = f"{child_allele_1}|{child_allele_2}"
+    else:
+        phase = "."
+    return(phase)
 
 # Create a dictionary where the key is the family members title, and the value is the sample's ID in the VCF.
 sample_ids = {} #The dictionary that relate_sample_name_to_file() will use
@@ -223,31 +263,11 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
                 line_list = new_line_list
                 line = "\t".join(line_list) + "\n"
                 line = line.replace(chrom, updated_chrom)
-                # This if and elif section phases the child using Mendelian 
-                # inheritance and lists paternal nucleotide first, and the 
-                # maternal nucleotide second.
-                if child_allele_1 in paternal_genotype \
-                    and child_allele_1 not in maternal_genotype \
-                    and child_allele_2 in maternal_genotype:
-                    phase = f"{child_allele_1}|{child_allele_2}"
-                    line = line.replace(child_genotype, phase)
-                    scaffold.write(line.encode())
-                elif child_allele_2 in paternal_genotype \
-                    and child_allele_2 not in maternal_genotype \
-                    and child_allele_1 in maternal_genotype:
-                    phase = f"{child_allele_2}|{child_allele_1}"
-                    line = line.replace(child_genotype, phase)
-                    scaffold.write(line.encode())
-                elif child_allele_1 in maternal_genotype \
-                    and child_allele_1 not in paternal_genotype \
-                    and child_allele_2 in paternal_genotype:
-                    phase = f"{child_allele_2}|{child_allele_1}"
-                    line = line.replace(child_genotype, phase)
-                    scaffold.write(line.encode())
-                elif child_allele_2 in maternal_genotype \
-                    and child_allele_2 not in paternal_genotype \
-                    and child_allele_1 in paternal_genotype:
-                    phase = f"{child_allele_1}|{child_allele_2}"
+
+                phase = get_phase(child_allele_1, child_allele_2, 
+                                paternal_genotype, maternal_genotype)
+                # Outputs phasable positions to the output scaffold
+                if phase != ".":
                     line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
 
@@ -325,73 +345,20 @@ for i in range(1, 23):
 
                 if chrom not in shapeit_positions:
                     shapeit_positions[chrom] = {}
+                phase = get_phase(child_allele_1, child_allele_2, 
+                                paternal_haplotype, maternal_haplotype)
+
                 # Checks if the "child_haplotype" (phased with SHAPEIT4) was
                 # correctly phased using Mendelian determined "phase".
-                if child_allele_1 in paternal_haplotype \
-                    and child_allele_1 not in maternal_haplotype \
-                    and child_allele_2 in maternal_haplotype:
-                    phase = f"{child_allele_1}|{child_allele_2}"
-                    if phase == child_haplotype:
-                        correctly_phased += 1
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                    else:
-                        incorrectly_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                elif child_allele_2 in paternal_haplotype \
-                    and child_allele_2 not in maternal_haplotype \
-                    and child_allele_1 in maternal_haplotype:
-                    phase = f"{child_allele_2}|{child_allele_1}"
-                    if phase == child_haplotype:
-                        correctly_phased += 1
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                    else:
-                        incorrectly_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                elif child_allele_1 in maternal_haplotype \
-                    and child_allele_1 not in paternal_haplotype \
-                    and child_allele_2 in paternal_haplotype:
-                    phase = f"{child_allele_2}|{child_allele_1}"
-                    if phase == child_haplotype:
-                        correctly_phased += 1
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                    else:
-                        incorrectly_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                elif child_allele_2 in maternal_haplotype \
-                    and child_allele_2 not in paternal_haplotype \
-                    and child_allele_1 in paternal_haplotype:
-                    phase = f"{child_allele_1}|{child_allele_2}"
-                    if phase == child_haplotype:
-                        correctly_phased += 1
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                    else:
-                        incorrectly_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                elif child_allele_1 == child_allele_2 \
-                    and child_allele_1 in maternal_haplotype \
-                    and child_allele_1 in paternal_haplotype:
-                    phase = f"{child_allele_1}|{child_allele_2}"
-                    if phase == child_haplotype:
-                        correctly_phased += 1
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                    else:
-                        incorrectly_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
+                if phase == child_haplotype and phase != ".":
+                    correctly_phased += 1
+                    line = "\t".join(line_list) + "\n"
+                    shapeit_positions[chrom][pos] = line
+                elif phase != child_haplotype and phase != ".":
+                    incorrectly_phased += 1
+                    line_list[child_index] = phase
+                    line = "\t".join(line_list) + "\n"
+                    shapeit_positions[chrom][pos] = line
                 else:
                     could_not_be_determined += 1
                     line = "\t".join(line_list) + "\n"
@@ -436,46 +403,9 @@ for i in range(1, 23):
                     line_list[paternal_index] = paternal_genotype
                     line_list[maternal_index] = maternal_genotype
                     # Phase using Mendelian inheritance when able.
-                    if child_allele_1 in paternal_genotype \
-                        and child_allele_1 not in maternal_genotype \
-                        and child_allele_2 in maternal_genotype:
-                        phase = f"{child_allele_1}|{child_allele_2}"
-                        not_in_shapeit += 1
-                        total_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                    elif child_allele_2 in paternal_genotype \
-                        and child_allele_2 not in maternal_genotype \
-                        and child_allele_1 in maternal_genotype:
-                        phase = f"{child_allele_2}|{child_allele_1}"
-                        not_in_shapeit += 1
-                        total_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                    elif child_allele_1 in maternal_genotype \
-                        and child_allele_1 not in paternal_genotype \
-                        and child_allele_2 in paternal_genotype:
-                        phase = f"{child_allele_2}|{child_allele_1}"
-                        not_in_shapeit += 1
-                        total_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                    elif child_allele_2 in maternal_genotype \
-                        and child_allele_2 not in paternal_genotype \
-                        and child_allele_1 in paternal_genotype:
-                        phase = f"{child_allele_1}|{child_allele_2}"
-                        not_in_shapeit += 1
-                        total_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                    elif child_allele_1 == child_allele_2 \
-                        and (child_allele_1 in paternal_genotype \
-                        and child_allele_1 in maternal_genotype):
-                        phase = f"{child_allele_1}|{child_allele_2}"
+                    phase = get_phase(child_allele_1, child_allele_2, 
+                                    paternal_genotype, maternal_genotype)
+                    if phase != ".":
                         not_in_shapeit += 1
                         total_phased += 1
                         line_list[child_index] = phase
