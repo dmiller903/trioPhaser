@@ -1,4 +1,5 @@
 # trioPhaser
+## Motivation
 When analyzing DNA sequence data of an affected individual, knowing which 
 nucleotide was inherited from which parent can be beneficial when trying to 
 identify certain types of DNA variants (e.g. compound heterozygous variants). 
@@ -25,6 +26,7 @@ increase the total number of correctly phased positions by using Mendelian
 inheritance to phase positions that SHAPEIT4 cannot phase, and to correct 
 erroneously phased positions output by SHAPEIT4 [insert manuscript doi here].
 
+## Execution
 trioPhaser is executed within a Docker container, therefore, the [Docker engine
 needs to be installed](https://docs.docker.com/desktop/) and the container 
 needs to be downloaded 
