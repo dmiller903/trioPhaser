@@ -13,7 +13,7 @@ apt-get update \
   unzip=6.0-21ubuntu1.1 \
   zip=3.0-11build1 \
   tar=1.29b-2ubuntu0.2 \
-  git=1:2.17.1-1ubuntu0.7 \
+  git=1:2.17.1-1ubuntu0.8 \
   # Install miniconda2 and config channels
   && wget --no-check-certificate https://repo.anaconda.com/miniconda/Miniconda3-py38_4.9.2-Linux-x86_64.sh \
   && bash Miniconda3-py38_4.9.2-Linux-x86_64.sh -b -p \
@@ -27,7 +27,12 @@ apt-get update \
   # Install samtools
   && conda install -c bioconda samtools=1.9 \
   # Download reference files
-  && wget --no-check-certificate https://files.osf.io/v1/resources/3znuj/providers/osfstorage/5d9f54d2a7bc73000ee99fd6/?zip= -O /fasta_references.zip
+  && wget --no-check-certificate https://files.osf.io/v1/resources/3znuj/providers/osfstorage/5d9f54d2a7bc73000ee99fd6/?zip= -O /fasta_references.zip \
+  # Clone trioPhaser from github and place python scripts at root
+  && git config --global http.sslverify "false" \
+  && git clone https://github.com/dmiller903/trioPhaser.git \
+  && cp trioPhaser/trio_phaser.py / \
+  && rm -r trioPhaser
 
 ENV \
   PATH=${PATH}:/root/miniconda3/bin/
