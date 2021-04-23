@@ -60,7 +60,8 @@ arguments. The arguments are required to be listed in order as follows:
 2. Input file of the father.
 3. Input file of the mother.
 4. Name of output file.
-5. Path were haplotype reference files will be saved to.
+5. Path were haplotype reference files will be saved to (requires ~13GB of
+storage).
 6. Number of cores available for use (up to 22, default is 2).
 
 Here we provide example code on how to execute trioPhaser. This example implies
