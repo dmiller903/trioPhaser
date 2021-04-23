@@ -60,7 +60,7 @@ arguments. The arguments are required to be listed in order as follows:
 3. Input file of the mother.
 4. Name of output file.
 5. Path were haplotype reference files will be saved to.
-6. Number of cores available for use (up to 22).
+6. Number of cores available for use (up to 22, default is 2).
 
 Here we provide example code on how to execute trioPhaser. This example implies
 that the gVCF files are found within the "/Data" directory of the local machine,
