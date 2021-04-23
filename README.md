@@ -1,4 +1,3 @@
-# trioPhaser
 ## Motivation
 When analyzing DNA sequence data of an affected individual, knowing which 
 nucleotide was inherited from which parent can be beneficial when trying to 
