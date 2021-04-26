@@ -30,6 +30,7 @@ apt-get update \
   && wget --no-check-certificate https://files.osf.io/v1/resources/3znuj/providers/osfstorage/5d9f54d2a7bc73000ee99fd6/?zip= -O /fasta_references.zip \
   # Clone trioPhaser from github and place python scripts at root
   && git config --global http.sslverify "false" \
+  && cd / \
   && git clone https://github.com/dmiller903/trioPhaser.git \
   && cp trioPhaser/trio_phaser.py /
 
