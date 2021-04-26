@@ -31,8 +31,7 @@ apt-get update \
   # Clone trioPhaser from github and place python scripts at root
   && git config --global http.sslverify "false" \
   && git clone https://github.com/dmiller903/trioPhaser.git \
-  && cp trioPhaser/trio_phaser.py / \
-  && rm -r trioPhaser
+  && cp trioPhaser/trio_phaser.py /
 
 ENV \
   PATH=${PATH}:/root/miniconda3/bin/

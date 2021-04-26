@@ -1,4 +1,25 @@
 import gzip
+import argparse
+
+# Argparse Information
+parser = argparse.ArgumentParser(description='Compares the trioPhaser phased \
+                                output to the 10X phased output')
+parser.add_argument('trioPhaser_output_file', 
+                    help='The location and name of the trioPhaser output file.')
+parser.add_argument('tenX_output_file', 
+                    help='The location and name of the 10X output file.')
+parser.add_argument('output_files_path', 
+                    help = 'The path where the output files should be stored.\
+                        There is an output for congrugent positions, and output\
+                        for positions phased by trioPhaser but not 10X, a file \
+                        for positions phased incorrectly by 10X')
+
+args = parser.parse_args()
+
+# Create variables of each argument from argparse
+trioPhaser_file = args.trioPhaser_output_file
+tenX_file = args.tenX_output_file
+output_path = args.output_files_path
 
 # Functions
 def get_header_indexes(header_line_list):
@@ -35,7 +56,7 @@ def nucleotide_based_haplotype(input_list, ref_allele, alt_allele_list):
 haplotype_dict = {}
 phase_set = {}
 tenX_total_variants = 0
-with gzip.open("son_GRCh38_longRanger.vcf.gz", "rt") as long_ranger:
+with gzip.open(tenX_file, "rt") as long_ranger:
     for line in long_ranger:
         if line.startswith("##"):
             continue
@@ -85,7 +106,7 @@ phase_set_number_wrong = {}
 number_in_phase_set = {}
 trio_phaser_total_phased = 0
 mendelian_phasable = {}
-with gzip.open("giab_phased.vcf.gz", "rt") as trio_phaser:
+with gzip.open(trioPhaser_file, "rt") as trio_phaser:
     for line in trio_phaser:
         if line.startswith("##"):
             continue
@@ -188,10 +209,10 @@ with gzip.open("giab_phased.vcf.gz", "rt") as trio_phaser:
                             number_in_phase_set[phase_set_value] += 1
 
 phased_incorrectly_by_10X = {}
-with gzip.open("giab_phased.vcf.gz", "rt") as trio_phaser, \
-    open("issues.tsv", 'wt') as output, \
-    gzip.open("phased_by_trio_phaser_but_not_10X.vcf.gz", "wb") as unique_to_trio_phaser, \
-    gzip.open("phased_congruently.vcf.gz", "wb") as phased_out:
+with gzip.open(trioPhaser_file, "rt") as trio_phaser, \
+    open(f"{output_path}issues.tsv", 'wt') as output, \
+    gzip.open(f"{output_path}phased_by_trio_phaser_but_not_10X.vcf.gz", "wb") as unique_to_trio_phaser, \
+    gzip.open(f"{output_path}phased_congruently.vcf.gz", "wb") as phased_out:
     for line in trio_phaser:
         if line.startswith("##"):
             unique_to_trio_phaser.write(line.encode())
@@ -315,8 +336,8 @@ with gzip.open("giab_phased.vcf.gz", "rt") as trio_phaser, \
                 unique_to_trio_phaser.write(line.encode())
                 phased_but_not_in_10X += 1
 
-with gzip.open("son_GRCh38_longRanger.vcf.gz", "rt") as input, \
-    gzip.open("mendelian_phased_incorrectly_by_10X.vcf.gz", "wb") as mendelian_out:
+with gzip.open(tenX_file, "rt") as input, \
+    gzip.open(f"{output_path}mendelian_phased_incorrectly_by_10X.vcf.gz", "wb") as mendelian_out:
      for line in input:
         if line.startswith("##"):
             mendelian_out.write(line.encode())
