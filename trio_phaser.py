@@ -298,7 +298,8 @@ if not os.path.exists(f"{haplotype_path}ALL.chr1.shapeit2_integrated_snvindels_v
 # Create a list of shapeit4 execution commands.
 task_list = []
 for i in range(22, 0, -1):
-    task_list.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b38.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotype_path}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
+    if os.path.exists(f"/tmp/genotyped_chr{i}.vcf.gz"):
+        task_list.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b38.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotype_path}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
 
 # Phase with shapeit4, using concurrent.futures to phase all chromosomes at once.
 with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) as executor:
@@ -314,103 +315,105 @@ total_phased = 0
 could_not_be_determined = 0
 header = ""
 for i in range(1, 23):
-    with gzip.open(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz", "rt") as phasedFile:
-        for line in phasedFile:
-            if line.startswith("##"):
-                if i == 1:
-                    header = header + line
-            elif line.startswith("#CHROM"):
-                line_list = line.rstrip("\n").split("\t")
-                child_index = line_list.index(sample_ids["child"])
-                paternal_index = line_list.index(sample_ids["paternal"])
-                maternal_index = line_list.index(sample_ids["maternal"])
-                pos_index = line_list.index("POS")
-                chrom_index = line_list.index("#CHROM")
-                info_index = line_list.index("INFO")
-                if i == 1:
-                    header = header + line
-            else:
-                total_phased += 1
-                total_variants += 1
-                line_list = line.rstrip("\n").split("\t")
-                chrom = line_list[chrom_index]
-                pos = int(line_list[pos_index])
-                child_haplotype = line_list[child_index]
-                paternal_haplotype = line_list[paternal_index]
-                maternal_haplotype = line_list[maternal_index]
-                child_allele_1 = child_haplotype[0]
-                child_allele_2 = child_haplotype[-1]
-                line_list[info_index] = "."
-                line_list[chrom_index] = "chr" + chrom
-
-                if chrom not in shapeit_positions:
-                    shapeit_positions[chrom] = {}
-                phase = get_phase(child_allele_1, child_allele_2, 
-                                paternal_haplotype, maternal_haplotype)
-
-                # Checks if the "child_haplotype" (phased with SHAPEIT4) was
-                # correctly phased using Mendelian determined "phase".
-                if phase == child_haplotype and phase != ".":
-                    correctly_phased += 1
-                    line = "\t".join(line_list) + "\n"
-                    shapeit_positions[chrom][pos] = line
-                elif phase != child_haplotype and phase != ".":
-                    incorrectly_phased += 1
-                    line_list[child_index] = phase
-                    line = "\t".join(line_list) + "\n"
-                    shapeit_positions[chrom][pos] = line
+    if os.path.exists(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz"):
+        with gzip.open(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz", "rt") as phasedFile:
+            for line in phasedFile:
+                if line.startswith("##"):
+                    if i == 1:
+                        header = header + line
+                elif line.startswith("#CHROM"):
+                    line_list = line.rstrip("\n").split("\t")
+                    child_index = line_list.index(sample_ids["child"])
+                    paternal_index = line_list.index(sample_ids["paternal"])
+                    maternal_index = line_list.index(sample_ids["maternal"])
+                    pos_index = line_list.index("POS")
+                    chrom_index = line_list.index("#CHROM")
+                    info_index = line_list.index("INFO")
+                    if i == 1:
+                        header = header + line
                 else:
-                    could_not_be_determined += 1
-                    line = "\t".join(line_list) + "\n"
-                    shapeit_positions[chrom][pos] = line
+                    total_phased += 1
+                    total_variants += 1
+                    line_list = line.rstrip("\n").split("\t")
+                    chrom = line_list[chrom_index]
+                    pos = int(line_list[pos_index])
+                    child_haplotype = line_list[child_index]
+                    paternal_haplotype = line_list[paternal_index]
+                    maternal_haplotype = line_list[maternal_index]
+                    child_allele_1 = child_haplotype[0]
+                    child_allele_2 = child_haplotype[-1]
+                    line_list[info_index] = "."
+                    line_list[chrom_index] = "chr" + chrom
+
+                    if chrom not in shapeit_positions:
+                        shapeit_positions[chrom] = {}
+                    phase = get_phase(child_allele_1, child_allele_2, 
+                                    paternal_haplotype, maternal_haplotype)
+
+                    # Checks if the "child_haplotype" (phased with SHAPEIT4) was
+                    # correctly phased using Mendelian determined "phase".
+                    if phase == child_haplotype and phase != ".":
+                        correctly_phased += 1
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    elif phase != child_haplotype and phase != ".":
+                        incorrectly_phased += 1
+                        line_list[child_index] = phase
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
+                    else:
+                        could_not_be_determined += 1
+                        line = "\t".join(line_list) + "\n"
+                        shapeit_positions[chrom][pos] = line
 
 # Iterate through the genotyped file and if the position was not phased by 
 # SHAPEIT4, determine if it's phasable and if it is, put it in the final output.
 not_in_shapeit = 0
 for i in range(1, 23):
-    with gzip.open(f"/tmp/genotyped_chr{i}.vcf.gz", "rt") as genotypeFile:
-        for line in genotypeFile:
-            if line.startswith("##"):
-                continue
-            elif line.startswith("#CHROM"):
-                line_list = line.rstrip("\n").split("\t")
-                child_index = line_list.index(sample_ids["child"])
-                paternal_index = line_list.index(sample_ids["paternal"])
-                maternal_index = line_list.index(sample_ids["maternal"])
-                pos_index = line_list.index("POS")
-                chrom_index = line_list.index("#CHROM")
-                filter_index = line_list.index("FILTER")
-                info_index = line_list.index("INFO")
-                format_index = line_list.index("FORMAT")
-            else:
-                line_list = line.rstrip("\n").split("\t")
-                chrom = line_list[chrom_index]
-                pos = int(line_list[pos_index])
-                child_haplotype = line_list[child_index].split(":")[0]
-                paternal_genotype = line_list[paternal_index].split(":")[0]
-                maternal_genotype = line_list[maternal_index].split(":")[0]
-                child_allele_1 = child_haplotype[0]
-                child_allele_2 = child_haplotype[-1]
-                # If the position is not in the shapeit_positions dictionary, 
-                # then Mendelian inheritance logic is used to see if position 
-                # is phasable.
-                if pos not in shapeit_positions[chrom]:
-                    total_variants += 1
-                    line_list[filter_index] = "."
-                    line_list[info_index] = "."
-                    line_list[format_index] = "GT"
-                    line_list[chrom_index] = "chr" + chrom
-                    line_list[paternal_index] = paternal_genotype
-                    line_list[maternal_index] = maternal_genotype
-                    # Phase using Mendelian inheritance when able.
-                    phase = get_phase(child_allele_1, child_allele_2, 
-                                    paternal_genotype, maternal_genotype)
-                    if phase != ".":
-                        not_in_shapeit += 1
-                        total_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
+    if os.path.exists(f"/tmp/genotyped_chr{i}.vcf.gz"):
+        with gzip.open(f"/tmp/genotyped_chr{i}.vcf.gz", "rt") as genotypeFile:
+            for line in genotypeFile:
+                if line.startswith("##"):
+                    continue
+                elif line.startswith("#CHROM"):
+                    line_list = line.rstrip("\n").split("\t")
+                    child_index = line_list.index(sample_ids["child"])
+                    paternal_index = line_list.index(sample_ids["paternal"])
+                    maternal_index = line_list.index(sample_ids["maternal"])
+                    pos_index = line_list.index("POS")
+                    chrom_index = line_list.index("#CHROM")
+                    filter_index = line_list.index("FILTER")
+                    info_index = line_list.index("INFO")
+                    format_index = line_list.index("FORMAT")
+                else:
+                    line_list = line.rstrip("\n").split("\t")
+                    chrom = line_list[chrom_index]
+                    pos = int(line_list[pos_index])
+                    child_haplotype = line_list[child_index].split(":")[0]
+                    paternal_genotype = line_list[paternal_index].split(":")[0]
+                    maternal_genotype = line_list[maternal_index].split(":")[0]
+                    child_allele_1 = child_haplotype[0]
+                    child_allele_2 = child_haplotype[-1]
+                    # If the position is not in the shapeit_positions dictionary, 
+                    # then Mendelian inheritance logic is used to see if position 
+                    # is phasable.
+                    if pos not in shapeit_positions[chrom]:
+                        total_variants += 1
+                        line_list[filter_index] = "."
+                        line_list[info_index] = "."
+                        line_list[format_index] = "GT"
+                        line_list[chrom_index] = "chr" + chrom
+                        line_list[paternal_index] = paternal_genotype
+                        line_list[maternal_index] = maternal_genotype
+                        # Phase using Mendelian inheritance when able.
+                        phase = get_phase(child_allele_1, child_allele_2, 
+                                        paternal_genotype, maternal_genotype)
+                        if phase != ".":
+                            not_in_shapeit += 1
+                            total_phased += 1
+                            line_list[child_index] = phase
+                            line = "\t".join(line_list) + "\n"
+                            shapeit_positions[chrom][pos] = line
 
 # Print summary statistics.
 print(f"\nThere were {correctly_phased} ({(correctly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) correctly phased haplotypes, and {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) incorrectly phased haplotypes.")
