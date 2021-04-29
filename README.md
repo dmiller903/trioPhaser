@@ -80,11 +80,17 @@ files were created can be found within our
 attached and called this directory "/proj" within the container, 3) we set 
 "/proj" as our working directory within the container, 4) the 
 "haplotype_references" directory has been created and is located at 
-"/Data/haplotype_references" (this is where trioPhaser will store the haplotype
+"/Data/haplotype_references" (*this is where trioPhaser will store the haplotype
 reference data), 5) the output file will be written to 
 "/Data/phased_output.vcf.gz", 6) the container ID will be stored at 
 "/Data/trio_phaser.out" upon execution, and 7) 2 CPU cores are available on the
-local machine for trioPhaser to use:
+local machine for trioPhaser to use.
+
+*Note: The first time trioPhaser is executed, the haplotype reference files
+are downloaded to the path specified. This download process can take awhile
+depending on internet speeds. Therefore, expect a longer than usual run-time. 
+Upon subsequent trioPhaser runs, the reference files will not be downloaded as 
+long as trioPhaser has access to the path where these files are stored.
 
 ```ignore
 docker run -d -v /Data:/proj -w /proj -t dmill903/triophaser:1.0 \
