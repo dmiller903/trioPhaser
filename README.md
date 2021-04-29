@@ -27,13 +27,11 @@ positions output by *SHAPEIT4* [insert manuscript doi here].
 ## Execution
 trioPhaser is executed within a Docker container, therefore, the [Docker engine
 needs to be installed](https://docs.docker.com/desktop/) and the container 
-needs to be downloaded 
-([triophaser](https://hub.docker.com/repository/docker/dmill903/triophaser])). 
-The triophaser container contains all the software that the "trio_phaser.py" 
-script relies on. The "trio_phaser.py" script found in this repository is also 
-contained within the container at the root directory. Therefore, when using the
-triophaser Docker container, this repository (dmiller903/trioPhaser) does not 
-need to be cloned. 
+needs to be downloaded ([triophaser](https://hub.docker.com/repository/docker/dmill903/triophaser])). The triophaser container contains all the software that the "trio_phaser.py" script relies on.
+The "trio_phaser.py" script found in this repository is also contained within 
+the container at the root directory. Therefore, when using the triophaser 
+Docker container, this repository (dmiller903/trioPhaser) does not need to be 
+cloned. 
 
 To download trioPhaser after docker is installed, use:
 ```
@@ -78,10 +76,9 @@ Here we provide example code on how to execute trioPhaser. In this example,
 the input files are provided within the container. Under normal circumstances,
 the input files will be on your local machine. Details on how the provided 
 files were created can be found within our  
-[validation documentation](https://github.com/dmiller903/trioPhaser/blob/main/\validate/validate.pdf). 
-This example implies that 1) there is a directory called "/Data" on the local 
-machine, 2) we attached and called this directory "/proj" within the container,
-3) we set "/proj" as our working directory within the container, 4) the 
+[validation documentation](https://github.com/dmiller903/trioPhaser/blob/main/\validate/validate.pdf). This example implies that 1) there is a directory called "/Data" on the local machine, 2) we
+attached and called this directory "/proj" within the container, 3) we set 
+"/proj" as our working directory within the container, 4) the 
 "haplotype_references" directory has been created and is located at 
 "/Data/haplotype_references" (this is where trioPhaser will store the haplotype
 reference data), 5) the output file will be written to 
