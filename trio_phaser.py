@@ -284,16 +284,9 @@ print(
 # Extract genetic maps and download haplotype references if necessary
 os.system("tar -xf /shapeit4/maps/genetic_maps.b38.tar.gz -C /shapeit4/maps/")
 if not os.path.exists(f"{haplotype_path}ALL.chr1.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz"):
-    files_to_download = []
-    for i in range(1,23):
-        files_to_download.append(f"wget --no-check-certificate http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000_genomes_project/release/20190312_biallelic_SNV_and_INDEL/ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz -P {haplotype_path}")
-    with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) as executor:
-        executor.map(os_system_task, files_to_download)
-    filesToIndex = []
-    for i in range(1,23):
-        filesToIndex.append(f"bcftools index {haplotype_path}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz")
-    with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) as executor:
-        executor.map(os_system_task, filesToIndex)
+    os.system("wget --no-check-certificate https://files.osf.io/v1/resources/rbzma/providers/osfstorage/608b8dd719183d00cb5556c3/?zip= -O /haplotype_references.zip")
+    os.system(f"unzip /haplotype_references.zip -d {haplotype_path}")
+    os.system(f"chmod 777 {haplotype_path}*")
 
 # Create a list of shapeit4 execution commands.
 task_list = []
@@ -433,6 +426,7 @@ with gzip.open(output_file.replace(".gz", ""), "wb") as output:
 os.system(f"zcat {output_file.replace('.gz', '')} | bgzip -f > {output_file}")
 os.system(f"tabix -fp vcf {output_file}")
 os.system(f"bcftools index {output_file}")
+os.system(f"chmod 777 {output_file} {output_file}.tbi {output_file}.csi")
 os.system(f"rm {output_file.replace('.gz', '')}")
 print(f"\nPhased output file written as {output_file}\n")
 
