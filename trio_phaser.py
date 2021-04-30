@@ -308,6 +308,7 @@ total_variants = 0
 total_phased = 0
 could_not_be_determined = 0
 header = ""
+header_written = False
 for i in range(1, 23):
     if os.path.exists(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz"):
         with gzip.open(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz", "rt") as phasedFile:
@@ -323,8 +324,9 @@ for i in range(1, 23):
                     pos_index = line_list.index("POS")
                     chrom_index = line_list.index("#CHROM")
                     info_index = line_list.index("INFO")
-                    if i == 1:
+                    if header_written is False:
                         header = header + line
+                        header_written = True
                 else:
                     total_phased += 1
                     total_variants += 1
@@ -410,7 +412,8 @@ for i in range(1, 23):
                             shapeit_positions[chrom][pos] = line
 
 # Print summary statistics.
-print(f"\nThere were {correctly_phased} ({(correctly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) correctly phased haplotypes, and {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) incorrectly phased haplotypes.")
+print(f"\nThere were {correctly_phased} ({(correctly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) correctly phased haplotypes, and {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) incorrectly phased haplotypes. (as phased by SHAPEIT4)")
+print(f"The {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) incorrectly phased haplotypes were corrected using Mendelian inheritance and will be included the phased output file")
 print(f"{not_in_shapeit} variants were not phased by shapeit but were phasable and will be included in final output.")
 print(f'{could_not_be_determined} phased variants (as phased by SHAPEIT4) could not be verified by using Mendelian inheritance alone.')
 print(f"There were {total_phased} total variants phased.\n")
