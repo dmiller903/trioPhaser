@@ -287,6 +287,7 @@ if not os.path.exists(f"{haplotype_path}ALL.chr1.shapeit2_integrated_snvindels_v
     os.system("wget --no-check-certificate https://files.osf.io/v1/resources/rbzma/providers/osfstorage/608b8dd719183d00cb5556c3/?zip= -O /haplotype_references.zip")
     os.system(f"unzip /haplotype_references.zip -d {haplotype_path}")
     os.system(f"chmod 777 {haplotype_path}*")
+    os.system("rm /haplotype_references.zip")
 
 # Create a list of shapeit4 execution commands.
 task_list = []
