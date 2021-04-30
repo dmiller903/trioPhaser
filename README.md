@@ -107,6 +107,6 @@ docker run -d -v /Data:/proj -w /proj -t dmill903/triophaser:1.0 \
 To look at the log file from the above example, on your local machine, type:
 
 ```ignore
-CONTAINERID="cat /Data/trio_phaser_giab.out"
-docker logs `$CONTAINERID` >> /Data/trio_phaser_giab.out
+CONTAINERID="cat /Data/trio_phaser.out"
+docker logs `$CONTAINERID` >> /Data/trio_phaser.out
 ```
