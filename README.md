@@ -17,9 +17,10 @@ Mendelian inheritance logic and *SHAPEIT4* [insert manuscript doi here].
 # Usage
 <a href="https://drive.google.com/uc?export=view&id=1JM_LIaA9Mp4DeqiH7UCkTF3KfcIIHIWc">
     <img src="https://drive.google.com/uc?export=view&id=1JM_LIaA9Mp4DeqiH7UCkTF3KfcIIHIWc"
-    style="width: 200px; max-width: 100%; height: auto"
+    style="width: 300px; max-width: 50%; height: auto"
     title="Click for the larger version." />
 </a>
+
 ## Pull the trioPhaser image (requires Docker installation)
 ```
 docker pull dmill903/triophaser:1.0
