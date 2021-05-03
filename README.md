@@ -36,6 +36,9 @@ machine. For example, if you want the output to be stored at "/tmp" and within
 "/tmp" you have a folder called "references", you would change "/Data" to "/tmp"
 and "haplotype_references" to "references".
 
+Please use "docker run -t dmill903/triophaser:1.0 python3 /trio_phaser.py -h"
+learn more about trioPhaser's arguments.
+
 ```ignore
 docker run -d -v /Data:/proj -w /proj -t dmill903/triophaser:1.0 \
   python3 /trio_phaser.py \
