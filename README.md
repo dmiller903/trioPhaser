@@ -20,7 +20,7 @@ Mendelian inheritance logic and *SHAPEIT4* [insert manuscript doi here].
 ```
 docker pull dmill903/triophaser:1.0
 ```
-## Run trioPhaser on the included example data (see [here](https://github.com/dmiller903/trioPhaser/blob/main/\validate/validate.pdf) for how we generated the files and for more details on how to run trioPhaser)
+## Run trioPhaser on the included example data (see [here](https://github.com/dmiller903/trioPhaser/blob/main/validate/validate.pdf) for how we generated the files and for more details on how to run trioPhaser)
 Here we provide example code on how to execute trioPhaser. In this example, 
 the input files are provided within the container. Under normal circumstances, 
 the input files will be on your local machine. This example implies that 1) 
