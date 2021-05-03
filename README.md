@@ -15,7 +15,7 @@ trioPhaser can increase the total number of correctly phased positions by using
 Mendelian inheritance logic and *SHAPEIT4* [insert manuscript doi here].
 
 # Usage
-![trioPhaser usage](https://drive.google.com/file/d/1JM_LIaA9Mp4DeqiH7UCkTF3KfcIIHIWc/view?usp=sharing)
+![trioPhaser usage](https://drive.google.com/file/d/1JM_LIaA9Mp4DeqiH7UCkTF3KfcIIHIWc/view)
 ## Pull the trioPhaser image (requires Docker installation):
 ```
 docker pull dmill903/triophaser:1.0
