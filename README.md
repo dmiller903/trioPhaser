@@ -15,8 +15,8 @@ trioPhaser can increase the total number of correctly phased positions by using
 Mendelian inheritance logic and *SHAPEIT4* [insert manuscript doi here].
 
 # Usage
-<a href="https://drive.google.com/uc?export=view&id=1JM_LIaA9Mp4DeqiH7UCkTF3KfcIIHIWc">
-    <img src="https://drive.google.com/uc?export=view&id=1JM_LIaA9Mp4DeqiH7UCkTF3KfcIIHIWc"
+<a href="https://drive.google.com/uc?export=view&id=1nyXEPdG9lpC_ggYvgR2yerJ90kb-ByY2">
+    <img src="https://drive.google.com/uc?export=view&id=1nyXEPdG9lpC_ggYvgR2yerJ90kb-ByY2"
     style="width: 100px; max-width: 25%; height: auto"
     title="Click for the larger version." />
 </a>
