@@ -48,14 +48,14 @@ Use `docker run -t dmill903/triophaser:1.0 python3 /trio_phaser.py -h`
 learn more about trioPhaser's arguments.
 
 ```ignore
-docker run -d -v ~/Downloads:/proj -w /proj -t dmill903/triophaser:1.0 \
+docker run -d -v /Data:/proj -w /proj -t dmill903/triophaser:1.0 \
   python3 /trio_phaser.py \
   /trioPhaser/validate/son_GRCh38_chr22.g.vcf.gz \
   /trioPhaser/validate/father_GRCh38_chr22.g.vcf.gz \
   /trioPhaser/validate/mother_GRCh38_chr22.g.vcf.gz \
   /proj/phased_output.vcf.gz \
   /proj/haplotype_references \
-  > ~/Downloads/trio_phaser.out
+  > /Data/trio_phaser.out
 ```
 
 *\*Note: The first time trioPhaser is run, it will download reference files, 
