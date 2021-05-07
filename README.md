@@ -29,19 +29,19 @@ docker pull dmill903/triophaser:1.0
 Here we provide example code on how to execute trioPhaser. In this example, 
 the input files are provided within the container. Under normal circumstances, 
 the input files will be on your local machine. This example implies that 1) 
-there is a directory called "/Data" on the local machine, 2) we attached and 
-called this directory "/proj" within the container, 3) we set "/proj" as our 
-working directory within the container, 4) the "haplotype_references" directory
-has been created and is located at "/Data/haplotype_references" (*this is where
+there is a directory called `/Data` on the local machine, 2) we attached and 
+called this directory `/proj` within the container, 3) we set `/proj` as our 
+working directory within the container, 4) the `haplotype_references` directory
+has been created and is located at `/Data/haplotype_references` (*this is where
 trioPhaser will store the haplotype reference data), 5) the output file will be
-written to "/Data/phased_output.vcf.gz", and 6) the container ID will be stored
-at "/Data/trio_phaser.out" upon execution. Please update "/Data" and 
-"haplotype_references" with the directories you want to use on your local
-machine. For example, if you want the output to be stored at "/tmp" and within
-"/tmp" you have a folder called "references", you would change "/Data" to "/tmp"
-and "haplotype_references" to "references".
+written to `/Data/phased_output.vcf.gz`, and 6) the container ID will be stored
+at `/Data/trio_phaser.out` upon execution. Please update `/Data` and 
+`haplotype_references` with the directories you want to use on your local
+machine. For example, if you want the output to be stored at `/tmp` and within
+`/tmp` you have a folder called `references`, you would change `/Data` to `/tmp`
+and `haplotype_references` to `references`.
 
-Please use "docker run -t dmill903/triophaser:1.0 python3 /trio_phaser.py -h"
+Please use `docker run -t dmill903/triophaser:1.0 python3 /trio_phaser.py -h`
 learn more about trioPhaser's arguments.
 
 ```ignore
