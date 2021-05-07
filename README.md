@@ -21,7 +21,7 @@ Mendelian inheritance logic and *SHAPEIT4* [insert manuscript doi here].
     title="Click for the larger version." />
 </a>
 
-## Pull the trioPhaser image (requires Docker installation)
+## Installation (requires Docker installation)
 ```
 docker pull dmill903/triophaser:1.0
 ```
@@ -35,7 +35,7 @@ working directory within the container, 4) the `haplotype_references` directory
 has been created and is located at `/Data/haplotype_references` (*this is where
 trioPhaser will store the haplotype reference data), 5) the output file will be
 written to `/Data/phased_output.vcf.gz`, and 6) the container ID will be stored
-at `/Data/trio_phaser.out` upon execution. Please update `/Data` and 
+at `/Data/trio_phaser.out` upon execution. Update `/Data` and 
 `haplotype_references` with the directories you want to use on your local
 machine. For example, if you want the output to be stored at `/tmp` and within
 `/tmp` you have a folder called `references`, you would change `/Data` to `/tmp`
@@ -45,14 +45,14 @@ Please use `docker run -t dmill903/triophaser:1.0 python3 /trio_phaser.py -h`
 learn more about trioPhaser's arguments.
 
 ```ignore
-docker run -d -v /Data:/proj -w /proj -t dmill903/triophaser:1.0 \
+docker run -d -v ~/Downloads:/proj -w /proj -t dmill903/triophaser:1.0 \
   python3 /trio_phaser.py \
   /trioPhaser/validate/son_GRCh38_chr22.g.vcf.gz \
   /trioPhaser/validate/father_GRCh38_chr22.g.vcf.gz \
   /trioPhaser/validate/mother_GRCh38_chr22.g.vcf.gz \
   /proj/phased_output.vcf.gz \
-  /proj/haplotype_references \ #Path were reference files will be saved
-  > /Data/trio_phaser.out
+  /proj/haplotype_references \
+  > ~/Downloads/trio_phaser.out
 ```
 
 *\*Note: The first time trioPhaser is run, it will download reference files, 
