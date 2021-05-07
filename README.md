@@ -21,7 +21,7 @@ Mendelian inheritance logic and *SHAPEIT4* [insert manuscript doi here].
     title="Click for the larger version." />
 </a>
 
-## Installation (requires [Docker installation]https://docs.docker.com/desktop/)
+## Installation (requires [Docker installation](https://docs.docker.com/desktop/))
 ```
 docker pull dmill903/triophaser:1.0
 ```
