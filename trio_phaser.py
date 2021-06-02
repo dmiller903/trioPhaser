@@ -183,6 +183,7 @@ with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) as executo
 files = ["/tmp/child_parsed.vcf.gz", "/tmp/paternal_parsed.vcf.gz", "/tmp/maternal_parsed.vcf.gz"]
 temp_combined_name = "/tmp/combined.vcf.gz"
 temp_genotyped_name = "/tmp/genotyped.vcf.gz"
+temp_genotyped_no_missing_genotypes = "/tmp/genotyped_no_missing.vcf.gz"
 
 file_string = ""
 for file in files:
@@ -207,9 +208,33 @@ elif build_version == 37:
     os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_references/human_g1k_v37_modified.fasta -V {temp_combined_name} -O {temp_genotyped_name}")
     print("Trio has been joint-genotyped.")
 
+# Remove any positions that are missing genotype information
+with gzip.open(temp_genotyped_name, "rt"), \
+    gzip.open(temp_genotyped_no_missing_genotypes, "wb") as new_genotype_file:
+    for line in new_genotype_file:
+        if line.startswith("##"):
+            new_genotype_file.write(line.encode())
+        elif line.startswith("#CHROM"):
+            header_chromosome = header_chromosome + line
+            line_list = line.rstrip("\n").split("\t")
+            chrom_index = line_list.index("#CHROM")
+            child_index = line_list.index(sample_ids["child"])
+            paternal_index = line_list.index(sample_ids["paternal"])
+            maternal_index = line_list.index(sample_ids["maternal"])
+            new_genotype_file.write(line.encode())
+        else:
+            line_list = line.rstrip("\n").split("\t")
+            chrom_index = line_list.index("#CHROM")
+            child_genotype = line_list[child_index].split(":")[0]
+            paternal_genotype = line_list[paternal_index].split(":")[0]
+            maternal_genotype = line_list[maternal_index].split(":")[0]
+            if "." not in child_genotype and "." not in paternal_genotype \
+                and "." not in maternal_genotype:
+                new_genotype_file.write(line.encode())
+
 # Separate combined trio file by chromosome and create child scaffold 
 # (phased VCF) for each chromosome
-with gzip.open(temp_genotyped_name, "rt") as vcf:
+with gzip.open(temp_genotyped_no_missing_genotypes, "rt") as vcf:
     output_name = f"/tmp/genotyped"
     chromosome_set = set()
     header_chromosome = ""
