@@ -27,7 +27,8 @@ apt-get update \
   # Install samtools
   && conda install -c bioconda samtools=1.9 \
   # Download reference files
-  && wget --no-check-certificate https://files.osf.io/v1/resources/3znuj/providers/osfstorage/5d9f54d2a7bc73000ee99fd6/?zip= -O /fasta_references.zip \
+  && wget --no-check-certificate https://files.osf.io/v1/resources/3znuj/providers/osfstorage/5d9f54d2a7bc73000ee99fd6/?zip= -O /fasta_reference_GRCh38.zip \
+  && wget --no-check-certificate https://files.osf.io/v1/resources/rbzma/providers/osfstorage/604a4ef9b57c9c007980627b/?zip= -O /fasta_reference_GRCh37.zip \
   # Clone trioPhaser from github and place python scripts at root
   && git config --global http.sslverify "false" \
   && cd / \

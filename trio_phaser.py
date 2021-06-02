@@ -24,10 +24,12 @@ parser.add_argument('haplotype_reference_files', help='The path where the \
     folder you want these files downloaded to are not within the same path as \
     you input files and/or output_files, you need to attach another volume to \
     the Docker container so the folder can be accessed.')
-parser.add_argument('number_of_tasks', help='Max number of cores that can be \
+parser.add_argument('--number_of_tasks', help='Max number of cores that can be \
     used in a given run. If 22 cores are availabe for use, all chromosomes will \
     be phased by SHAPEIT4 at the same time, significantly speeding up the overall \
     runtime.', default="2")
+parser.add_argument('--build_version', help='GRCh 37 or 38 are supported. GRCh38\
+    is used as default.', default='38')
 
 args = parser.parse_args()
 
@@ -40,6 +42,14 @@ haplotype_path = args.haplotype_reference_files
 if not haplotype_path.endswith("/"):
     haplotype_path = haplotype_path + "/"
 number_tasks = int(args.number_of_tasks)
+try:
+    if "38" in args.build_version:
+        build_version = 38
+    elif "37" in args.build_version:
+        build_version = 37
+except:
+    print("Build version unknown. Please indicate whether input files were \
+        GRCh build 37 or 38 using the --build_version argument.")
 
 # Functions
 def relate_sample_name_to_file(file, title):
@@ -173,22 +183,30 @@ with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) as executo
 files = ["/tmp/child_parsed.vcf.gz", "/tmp/paternal_parsed.vcf.gz", "/tmp/maternal_parsed.vcf.gz"]
 temp_combined_name = "/tmp/combined.vcf.gz"
 temp_genotyped_name = "/tmp/genotyped.vcf.gz"
-try:
-    file_string = ""
-    for file in files:
-        file_string += f"-V {file} "
-        os.system(f"gatk IndexFeatureFile -F {file}")
+
+file_string = ""
+for file in files:
+    file_string += f"-V {file} "
+    os.system(f"gatk IndexFeatureFile -F {file}")
+    
+if build_version == 38:
     # Extract fasta reference file
-    os.system("unzip /fasta_references.zip -d /fasta_references")
-    os.system("gzip -d /fasta_references/*.gz")
-    os.system(f"gatk CombineGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta {file_string} -O {temp_combined_name}")
+    os.system("unzip /fasta_reference_GRCh38.zip -d /fasta_reference")
+    os.system("gzip -d /fasta_reference/*.gz")
+    os.system(f"gatk CombineGVCFs -R /fasta_reference/Homo_sapiens_assembly38.fasta {file_string} -O {temp_combined_name}")
     print("Trio has been combined and written to a temporary file.")
     os.system(f"gatk IndexFeatureFile -F {temp_combined_name}")
-    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta -V {temp_combined_name} -O {temp_genotyped_name}")
+    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_reference/Homo_sapiens_assembly38.fasta -V {temp_combined_name} -O {temp_genotyped_name}")
     print("Trio has been joint-genotyped.")
-
-except:
-    print("Trio not combined, there was an error detected by GATK")
+elif build_version == 37:
+    # Extract fasta reference file
+    os.system("unzip /fasta_reference_GRCh37.zip -d /fasta_reference")
+    os.system("gzip -d /fasta_reference/*.gz")
+    os.system(f"gatk CombineGVCFs -R /fasta_reference/Homo_sapiens_assembly19.fasta {file_string} -O {temp_combined_name}")
+    print("Trio has been combined and written to a temporary file.")
+    os.system(f"gatk IndexFeatureFile -F {temp_combined_name}")
+    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_reference/Homo_sapiens_assembly19.fasta -V {temp_combined_name} -O {temp_genotyped_name}")
+    print("Trio has been joint-genotyped.")
 
 # Separate combined trio file by chromosome and create child scaffold 
 # (phased VCF) for each chromosome
@@ -283,17 +301,31 @@ print(
 
 # Extract genetic maps and download haplotype references if necessary
 os.system("tar -xf /shapeit4/maps/genetic_maps.b38.tar.gz -C /shapeit4/maps/")
-if not os.path.exists(f"{haplotype_path}ALL.chr1.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz"):
+if build_version == 38 \
+    and not os.path.exists(f"{haplotype_path}ALL.chr1.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz"):
     os.system("wget --no-check-certificate https://files.osf.io/v1/resources/rbzma/providers/osfstorage/608b8dd719183d00cb5556c3/?zip= -O /haplotype_references.zip")
     os.system(f"unzip /haplotype_references.zip -d {haplotype_path}")
     os.system(f"chmod 777 {haplotype_path}*")
     os.system("rm /haplotype_references.zip")
 
-# Create a list of shapeit4 execution commands.
-task_list = []
-for i in range(22, 0, -1):
-    if os.path.exists(f"/tmp/genotyped_chr{i}.vcf.gz"):
-        task_list.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b38.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotype_path}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
+    # Create a list of shapeit4 execution commands.
+    task_list = []
+    for i in range(22, 0, -1):
+        if os.path.exists(f"/tmp/genotyped_chr{i}.vcf.gz"):
+            task_list.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b37.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotype_path}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
+
+elif build_version == 37 \
+    and not os.path.exists(f"{haplotype_path}ALL.chr1.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz"):
+    os.system("wget --no-check-certificate https://files.osf.io/v1/resources/rbzma/providers/osfstorage/60b6c4639096b7023a63c8d0/?zip= -O /haplotype_references.zip")
+    os.system(f"unzip /haplotype_references.zip -d {haplotype_path}")
+    os.system(f"chmod 777 {haplotype_path}*")
+    os.system("rm /haplotype_references.zip")
+
+    # Create a list of shapeit4 execution commands.
+    task_list = []
+    for i in range(22, 0, -1):
+        if os.path.exists(f"/tmp/genotyped_chr{i}.vcf.gz"):
+            task_list.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b37.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotype_path}ALL.chr{i}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
 
 # Phase with shapeit4, using concurrent.futures to phase all chromosomes at once.
 with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) as executor:
@@ -309,58 +341,62 @@ total_phased = 0
 could_not_be_determined = 0
 header = ""
 header_written = False
-for i in range(1, 23):
-    if os.path.exists(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz"):
-        with gzip.open(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz", "rt") as phasedFile:
-            for line in phasedFile:
-                if line.startswith("##"):
-                    if i == 1:
-                        header = header + line
-                elif line.startswith("#CHROM"):
-                    line_list = line.rstrip("\n").split("\t")
-                    child_index = line_list.index(sample_ids["child"])
-                    paternal_index = line_list.index(sample_ids["paternal"])
-                    maternal_index = line_list.index(sample_ids["maternal"])
-                    pos_index = line_list.index("POS")
-                    chrom_index = line_list.index("#CHROM")
-                    info_index = line_list.index("INFO")
-                    if header_written is False:
-                        header = header + line
-                        header_written = True
-                else:
-                    total_phased += 1
-                    total_variants += 1
-                    line_list = line.rstrip("\n").split("\t")
-                    chrom = line_list[chrom_index]
-                    pos = int(line_list[pos_index])
-                    child_haplotype = line_list[child_index]
-                    paternal_haplotype = line_list[paternal_index]
-                    maternal_haplotype = line_list[maternal_index]
-                    child_allele_1 = child_haplotype[0]
-                    child_allele_2 = child_haplotype[-1]
-                    line_list[info_index] = "."
-                    line_list[chrom_index] = "chr" + chrom
-
-                    if chrom not in shapeit_positions:
-                        shapeit_positions[chrom] = {}
-                    phase = get_phase(child_allele_1, child_allele_2, 
-                                    paternal_haplotype, maternal_haplotype)
-
-                    # Checks if the "child_haplotype" (phased with SHAPEIT4) was
-                    # correctly phased using Mendelian determined "phase".
-                    if phase == child_haplotype and phase != ".":
-                        correctly_phased += 1
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
-                    elif phase != child_haplotype and phase != ".":
-                        incorrectly_phased += 1
-                        line_list[child_index] = phase
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
+with gzip.open(f"output_file.replace('.vcf.gz', \
+    '_phased_incorrectly_by_SHAPEIT4.vcf.gz')", "wb") as incorrectly_phased_out:
+    for i in range(1, 23):
+        if os.path.exists(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz"):
+            with gzip.open(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz", "rt") as phasedFile:
+                for line in phasedFile:
+                    if line.startswith("##"):
+                        if i == 1:
+                            header = header + line
+                    elif line.startswith("#CHROM"):
+                        line_list = line.rstrip("\n").split("\t")
+                        child_index = line_list.index(sample_ids["child"])
+                        paternal_index = line_list.index(sample_ids["paternal"])
+                        maternal_index = line_list.index(sample_ids["maternal"])
+                        pos_index = line_list.index("POS")
+                        chrom_index = line_list.index("#CHROM")
+                        info_index = line_list.index("INFO")
+                        if header_written is False:
+                            header = header + line
+                            incorrectly_phased_out.write(header.encode())
+                            header_written = True
                     else:
-                        could_not_be_determined += 1
-                        line = "\t".join(line_list) + "\n"
-                        shapeit_positions[chrom][pos] = line
+                        total_phased += 1
+                        total_variants += 1
+                        line_list = line.rstrip("\n").split("\t")
+                        chrom = line_list[chrom_index]
+                        pos = int(line_list[pos_index])
+                        child_haplotype = line_list[child_index]
+                        paternal_haplotype = line_list[paternal_index]
+                        maternal_haplotype = line_list[maternal_index]
+                        child_allele_1 = child_haplotype[0]
+                        child_allele_2 = child_haplotype[-1]
+                        line_list[info_index] = "."
+                        line_list[chrom_index] = "chr" + chrom
+
+                        if chrom not in shapeit_positions:
+                            shapeit_positions[chrom] = {}
+                        phase = get_phase(child_allele_1, child_allele_2, 
+                                        paternal_haplotype, maternal_haplotype)
+
+                        # Checks if the "child_haplotype" (phased with SHAPEIT4) was
+                        # correctly phased using Mendelian determined "phase".
+                        if phase == child_haplotype and phase != ".":
+                            correctly_phased += 1
+                            line = "\t".join(line_list) + "\n"
+                            shapeit_positions[chrom][pos] = line
+                        elif phase != child_haplotype and phase != ".":
+                            incorrectly_phased += 1
+                            incorrectly_phased_out.write(line.encode())
+                            line_list[child_index] = phase
+                            line = "\t".join(line_list) + "\n"
+                            shapeit_positions[chrom][pos] = line
+                        else:
+                            could_not_be_determined += 1
+                            line = "\t".join(line_list) + "\n"
+                            shapeit_positions[chrom][pos] = line
 
 # Iterate through the genotyped file and if the position was not phased by 
 # SHAPEIT4, determine if it's phasable and if it is, put it in the final output.
