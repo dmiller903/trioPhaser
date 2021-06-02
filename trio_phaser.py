@@ -229,7 +229,8 @@ with gzip.open(temp_genotyped_name, "rt"), \
             paternal_genotype = line_list[paternal_index].split(":")[0]
             maternal_genotype = line_list[maternal_index].split(":")[0]
             if "." not in child_genotype and "." not in paternal_genotype \
-                and "." not in maternal_genotype:
+                and "." not in maternal_genotype and (child_genotype != "0/0" \
+                    or child_genotype != "0|0"):
                 new_genotype_file.write(line.encode())
 
 # Separate combined trio file by chromosome and create child scaffold 
