@@ -316,13 +316,12 @@ elif build_version == 37 \
     os.system("rm /haplotype_references.zip")
 
 # Create a list of shapeit4 execution commands.
+task_list = []
 if build_version == 38:
-    task_list = []
     for i in range(22, 0, -1):
         if os.path.exists(f"/tmp/genotyped_chr{i}.vcf.gz"):
             task_list.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b38.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotype_path}ALL.chr{i}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
 elif build_version == 37:
-    task_list = []
     for i in range(22, 0, -1):
         if os.path.exists(f"/tmp/genotyped_chr{i}.vcf.gz"):
             task_list.append(f"shapeit4 --input /tmp/genotyped_chr{i}.vcf.gz --map /shapeit4/maps/chr{i}.b37.gmap.gz --region {i} --output /tmp/phased_chr{i}_with_scaffold.vcf.gz --reference {haplotype_path}ALL.chr{i}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz --sequencing --scaffold /tmp/genotyped_chr{i}_scaffold.vcf.gz --seed 123456789")
