@@ -189,23 +189,22 @@ for file in files:
     file_string += f"-V {file} "
     os.system(f"gatk IndexFeatureFile -F {file}")
     
+# Extract fasta reference file
+    os.system("unzip /fasta_references.zip -d /fasta_references")
+    os.system("gzip -d /fasta_references/*.gz")
+
+# Use GATK to combine the trio into a single file and then create a gVCF
 if build_version == 38:
-    # Extract fasta reference file
-    os.system("unzip /fasta_reference_GRCh38.zip -d /fasta_reference")
-    os.system("gzip -d /fasta_reference/*.gz")
-    os.system(f"gatk CombineGVCFs -R /fasta_reference/Homo_sapiens_assembly38.fasta {file_string} -O {temp_combined_name}")
+    os.system(f"gatk CombineGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta {file_string} -O {temp_combined_name}")
     print("Trio has been combined and written to a temporary file.")
     os.system(f"gatk IndexFeatureFile -F {temp_combined_name}")
-    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_reference/Homo_sapiens_assembly38.fasta -V {temp_combined_name} -O {temp_genotyped_name}")
+    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta -V {temp_combined_name} -O {temp_genotyped_name}")
     print("Trio has been joint-genotyped.")
 elif build_version == 37:
-    # Extract fasta reference file
-    os.system("unzip /fasta_reference_GRCh37.zip -d /fasta_reference")
-    os.system("gzip -d /fasta_reference/*.gz")
-    os.system(f"gatk CombineGVCFs -R /fasta_reference/Homo_sapiens_assembly19.fasta {file_string} -O {temp_combined_name}")
+    os.system(f"gatk CombineGVCFs -R /fasta_references/human_g1k_v37_modified.fasta {file_string} -O {temp_combined_name}")
     print("Trio has been combined and written to a temporary file.")
     os.system(f"gatk IndexFeatureFile -F {temp_combined_name}")
-    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_reference/Homo_sapiens_assembly19.fasta -V {temp_combined_name} -O {temp_genotyped_name}")
+    os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs -R /fasta_references/human_g1k_v37_modified.fasta -V {temp_combined_name} -O {temp_genotyped_name}")
     print("Trio has been joint-genotyped.")
 
 # Separate combined trio file by chromosome and create child scaffold 
