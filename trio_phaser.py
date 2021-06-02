@@ -341,8 +341,8 @@ total_phased = 0
 could_not_be_determined = 0
 header = ""
 header_written = False
-with gzip.open(f"output_file.replace('.vcf.gz', \
-    '_phased_incorrectly_by_SHAPEIT4.vcf.gz')", "wb") as incorrectly_phased_out:
+with gzip.open(output_file.replace('.vcf.gz', \
+    '_phased_incorrectly_by_SHAPEIT4.vcf.gz'), "wb") as incorrectly_phased_out:
     for i in range(1, 23):
         if os.path.exists(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz"):
             with gzip.open(f"/tmp/phased_chr{i}_with_scaffold.vcf.gz", "rt") as phasedFile:
