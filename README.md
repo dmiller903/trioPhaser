@@ -21,27 +21,30 @@ Mendelian inheritance logic and *SHAPEIT4* [insert manuscript doi here].
     title="Click for the larger version." />
 </a>
 
-## Pull the trioPhaser image (requires Docker installation)
+## Installation (requires [Docker installation](https://docs.docker.com/desktop/))
 ```
 docker pull dmill903/triophaser:1.0
 ```
 ## Run trioPhaser on the included example data (see [here](https://github.com/dmiller903/trioPhaser/blob/main/validate/validate.pdf) for how we generated the files and for more details on how to run trioPhaser)
 Here we provide example code on how to execute trioPhaser. In this example, 
 the input files are provided within the container. Under normal circumstances, 
-the input files will be on your local machine. This example implies that 1) 
-there is a directory called "/Data" on the local machine, 2) we attached and 
-called this directory "/proj" within the container, 3) we set "/proj" as our 
-working directory within the container, 4) the "haplotype_references" directory
-has been created and is located at "/Data/haplotype_references" (*this is where
-trioPhaser will store the haplotype reference data), 5) the output file will be
-written to "/Data/phased_output.vcf.gz", and 6) the container ID will be stored
-at "/Data/trio_phaser.out" upon execution. Please update "/Data" and 
-"haplotype_references" with the directories you want to use on your local
-machine. For example, if you want the output to be stored at "/tmp" and within
-"/tmp" you have a folder called "references", you would change "/Data" to "/tmp"
-and "haplotype_references" to "references".
+the input files will be on your local machine. This example implies the following:
 
-Please use "docker run -t dmill903/triophaser:1.0 python3 /trio_phaser.py -h"
+1. There is a directory called `/Data` on the local machine.
+2. We attached and called this directory `/proj` within the container.
+3. We set `/proj` as our working directory within the container.
+4. The `haplotype_references` directory has been created and is located at 
+`/Data/haplotype_references` (*this is where trioPhaser will store the 
+haplotype reference data).
+5. The output file will be written to `/Data/phased_output.vcf.gz`
+6. The container ID will be stored at `/Data/trio_phaser.out` upon execution. 
+
+Update `/Data` and `haplotype_references` with the directories you want to use 
+on your local machine. For example, if you want the output to be stored at 
+`/tmp` and within `/tmp` you have a folder called `references`, you would 
+change `/Data` to `/tmp` and `haplotype_references` to `references`.
+
+Use `docker run -t dmill903/triophaser:1.0 python3 /trio_phaser.py -h`
 learn more about trioPhaser's arguments.
 
 ```ignore
@@ -51,7 +54,7 @@ docker run -d -v /Data:/proj -w /proj -t dmill903/triophaser:1.0 \
   /trioPhaser/validate/father_GRCh38_chr22.g.vcf.gz \
   /trioPhaser/validate/mother_GRCh38_chr22.g.vcf.gz \
   /proj/phased_output.vcf.gz \
-  /proj/haplotype_references \ #Path were reference files will be saved
+  /proj/haplotype_references \
   > /Data/trio_phaser.out
 ```
 
