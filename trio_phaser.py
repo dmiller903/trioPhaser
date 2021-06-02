@@ -185,16 +185,16 @@ temp_combined_name = "/tmp/combined.vcf.gz"
 temp_genotyped_name = "/tmp/genotyped.vcf.gz"
 temp_genotyped_no_missing_genotypes = "/tmp/genotyped_no_missing.vcf.gz"
 
+# Extract fasta reference file
+os.system("unzip /fasta_references.zip -d /fasta_references")
+os.system("gzip -d /fasta_references/*.gz")
+
+# Use GATK to combine the trio into a single file and then create a gVCF
 file_string = ""
 for file in files:
     file_string += f"-V {file} "
     os.system(f"gatk IndexFeatureFile -F {file}")
-    
-# Extract fasta reference file
-    os.system("unzip /fasta_references.zip -d /fasta_references")
-    os.system("gzip -d /fasta_references/*.gz")
 
-# Use GATK to combine the trio into a single file and then create a gVCF
 if build_version == 38:
     os.system(f"gatk CombineGVCFs -R /fasta_references/Homo_sapiens_assembly38.fasta {file_string} -O {temp_combined_name}")
     print("Trio has been combined and written to a temporary file.")
@@ -209,13 +209,12 @@ elif build_version == 37:
     print("Trio has been joint-genotyped.")
 
 # Remove any positions that are missing genotype information
-with gzip.open(temp_genotyped_name, "rt"), \
+with gzip.open(temp_genotyped_name, "rt") as genotype_file, \
     gzip.open(temp_genotyped_no_missing_genotypes, "wb") as new_genotype_file:
-    for line in new_genotype_file:
+    for line in genotype_file:
         if line.startswith("##"):
             new_genotype_file.write(line.encode())
         elif line.startswith("#CHROM"):
-            header_chromosome = header_chromosome + line
             line_list = line.rstrip("\n").split("\t")
             chrom_index = line_list.index("#CHROM")
             child_index = line_list.index(sample_ids["child"])
@@ -224,7 +223,6 @@ with gzip.open(temp_genotyped_name, "rt"), \
             new_genotype_file.write(line.encode())
         else:
             line_list = line.rstrip("\n").split("\t")
-            chrom_index = line_list.index("#CHROM")
             child_genotype = line_list[child_index].split(":")[0]
             paternal_genotype = line_list[paternal_index].split(":")[0]
             maternal_genotype = line_list[maternal_index].split(":")[0]
