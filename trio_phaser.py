@@ -239,12 +239,23 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
             chrom = line_list[chrom_index]
             # Chromosomes are listed as "chr1", this removes the "chr"
             updated_chrom = chrom[3:]
+            child_genotype = line_list[child_index].split(":")[0]
+            paternal_genotype = line_list[paternal_index].split(":")[0]
+            maternal_genotype = line_list[maternal_index].split(":")[0]
+            child_allele_1 = child_genotype[0]
+            child_allele_2 = child_genotype[-1]
             line = line.replace(chrom, updated_chrom)
-            # output metadata to output chromosome and output scaffold
+            # output metadata to output chromosome and first genotype line if
+            # there is no missing genotype data
             with gzip.open(f"{output_name}_{chrom}.vcf", "wb") as chromosome, \
                 gzip.open(f"{output_name}_{chrom}_scaffold.vcf", "wb") as scaffold:
                 chromosome.write(header_chromosome.encode())
-                chromosome.write(line.encode())
+                if "." not in child_genotype and "." not in paternal_genotype \
+                and "." not in maternal_genotype and (child_genotype != "0/0" \
+                    or child_genotype != "0|0"):
+                    chromosome.write(line.encode())
+                
+                # Outputs phaseable positions to the output scaffold
                 new_line_list = []
                 for i in range(0, len(line_list)):
                     if i != maternal_index or i != paternal_index:
@@ -253,10 +264,18 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
                 line = "\t".join(line_list) + "\n"
                 line = line.replace(chrom, updated_chrom)
                 scaffold.write(header_scaffold.encode())
-                scaffold.write(line.encode())
                 chromosome_set.add(chrom)
+                
+                phase = get_phase(child_allele_1, child_allele_2, 
+                                paternal_genotype, maternal_genotype)
+                if phase != ".":
+                    line = line.replace(child_genotype, phase)
+                    scaffold.write(line.encode())
+
+                # Make a list of file names for SHAPEIT4 input
                 file_list_to_bgzip.append(f"{output_name}_{chrom}.vcf")
                 file_list_to_bgzip.append(f"{output_name}_{chrom}_scaffold.vcf")
+        
         elif not line.startswith("#") and line.split("\t")[0] in chromosome_set:
             line_list = line.rstrip("\n").split("\t")
             chrom = line_list[chrom_index]
@@ -267,7 +286,7 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
             child_allele_1 = child_genotype[0]
             child_allele_2 = child_genotype[-1]
             line = line.replace(chrom, updated_chrom)
-            # Output line to chromosome file
+            # Output line to chromosome file if no missing genotypes are found
             with gzip.open(f"{output_name}_{chrom}.vcf", "ab") as chromosome:
                 if "." not in child_genotype and "." not in paternal_genotype \
                 and "." not in maternal_genotype and (child_genotype != "0/0" \
