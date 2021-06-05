@@ -305,7 +305,7 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
 
                 phase = get_phase(child_allele_1, child_allele_2, 
                                 paternal_genotype, maternal_genotype)
-                # Outputs phasable positions to the output scaffold
+                # Outputs phaseable positions to the output scaffold
                 if phase != "." and phase != "0|0":
                     line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
@@ -419,8 +419,9 @@ with gzip.open(output_file.replace('.vcf.gz', \
                             shapeit_positions[chrom][pos] = line
 
 # Iterate through the genotyped file and if the position was not phased by 
-# SHAPEIT4, determine if it's phasable and if it is, put it in the final output.
+# SHAPEIT4, determine if it's phaseable and if it is, put it in the final output.
 not_in_shapeit = 0
+not_in_shapeit_het = 0
 for i in range(1, 23):
     if os.path.exists(f"/tmp/genotyped_chr{i}.vcf.gz"):
         with gzip.open(f"/tmp/genotyped_chr{i}.vcf.gz", "rt") as genotypeFile:
@@ -448,7 +449,7 @@ for i in range(1, 23):
                     child_allele_2 = child_haplotype[-1]
                     # If the position is not in the shapeit_positions dictionary, 
                     # then Mendelian inheritance logic is used to see if position 
-                    # is phasable.
+                    # is phaseable.
                     if pos not in shapeit_positions[chrom]:
                         total_variants += 1
                         line_list[filter_index] = "."
@@ -466,12 +467,15 @@ for i in range(1, 23):
                             line_list[child_index] = phase
                             line = "\t".join(line_list) + "\n"
                             shapeit_positions[chrom][pos] = line
+                            if child_allele_1 != child_allele_2:
+                                not_in_shapeit_het +=1
 
 # Print summary statistics.
-print(f"\nThere were {correctly_phased} ({(correctly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) correctly phased haplotypes, and {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) incorrectly phased haplotypes. (as phased by SHAPEIT4)")
-print(f"The {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) incorrectly phased haplotypes were corrected using Mendelian inheritance and will be included the phased output file")
-print(f"{not_in_shapeit} variants were not phased by shapeit but were phasable and will be included in final output.")
-print(f'{could_not_be_determined} phased variants (as phased by SHAPEIT4) could not be verified by using Mendelian inheritance alone.')
+print(f"\nThere were {correctly_phased} ({(correctly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) correctly phased haplotypes, and {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) incorrectly phased haplotypes. (as phased by SHAPEIT4)\n")
+print(f"The {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) incorrectly phased haplotypes were corrected using Mendelian inheritance and will be included the phased output file\n")
+print(f"{not_in_shapeit} variants were not phased by shapeit but were phaseable and will be included in final output.\n")
+print(f"Of the {not_in_shapeit} variants not phased by shapeit but were phaseable, {not_in_shapeit_het} ({(not_in_shapeit_het / not_in_shapeit) * 100:.5f}%) were heterozygous.\n")
+print(f'{could_not_be_determined} phased variants (as phased by SHAPEIT4) could not be verified by using Mendelian inheritance alone.\n')
 print(f"There were {total_phased} total variants phased.\n")
 print(f"There were {total_variants} total variants prior to any phasing.\n")
 
