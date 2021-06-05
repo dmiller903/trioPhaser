@@ -268,7 +268,7 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
                 
                 phase = get_phase(child_allele_1, child_allele_2, 
                                 paternal_genotype, maternal_genotype)
-                if phase != ".":
+                if phase != "." and phase != "0|0":
                     line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
 
@@ -306,7 +306,7 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
                 phase = get_phase(child_allele_1, child_allele_2, 
                                 paternal_genotype, maternal_genotype)
                 # Outputs phasable positions to the output scaffold
-                if phase != ".":
+                if phase != "." and phase != "0|0":
                     line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
 
@@ -460,7 +460,7 @@ for i in range(1, 23):
                         # Phase using Mendelian inheritance when able.
                         phase = get_phase(child_allele_1, child_allele_2, 
                                         paternal_genotype, maternal_genotype)
-                        if phase != ".":
+                        if phase != "." and phase != "0|0":
                             not_in_shapeit += 1
                             total_phased += 1
                             line_list[child_index] = phase
