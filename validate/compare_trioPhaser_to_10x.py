@@ -79,6 +79,7 @@ with gzip.open(tenX_file, "rt") as long_ranger:
             if chrom[3:].isnumeric() and int(chrom[3:]) in range(1, 23):
                 if chrom not in haplotype_dict \
                     and "|" in haplotype \
+                    and "." not in haplotype \
                     and qual != "." \
                     and float(qual) >= 20:
                     tenX_total_variants += 1
@@ -86,6 +87,7 @@ with gzip.open(tenX_file, "rt") as long_ranger:
                     phase_set[chrom] = {pos: phase_set_value}
                 elif chrom in haplotype_dict \
                     and "|" in haplotype \
+                    and "." not in haplotype \
                     and qual != "." \
                     and float(qual) >= 20:
                     tenX_total_variants += 1

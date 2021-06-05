@@ -77,12 +77,14 @@ with open(whatshap_file, "rt") as long_ranger:
             if chrom[3:].isnumeric() and int(chrom[3:]) in range(1, 23):
                 if chrom not in haplotype_dict \
                     and "|" in haplotype \
+                    and "." not in haplotype \
                     and qual != "." \
                     and float(qual) >= 20:
                     whatshap_total_variants += 1
                     haplotype_dict[chrom] = {pos: [ref, alt, haplotype]}
                 elif chrom in haplotype_dict \
                     and "|" in haplotype \
+                    and "." not in haplotype \
                     and qual != "." \
                     and float(qual) >= 20:
                     whatshap_total_variants += 1
