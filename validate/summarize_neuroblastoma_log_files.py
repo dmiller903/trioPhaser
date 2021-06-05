@@ -20,9 +20,11 @@ output_path = args.name_of_output
 
 stat_summary = {"initial variants": 0, "correctly phased by SHAPEIT4": 0, 
                 "incorrectly phased by SHAPEIT4": 0, 
-                "phasable but not phased by SHAPEIT4": 0, 
+                "phaseable but not phased by SHAPEIT4": 0, 
                 "phased by SHAPEIT4 but could not be verified": 0, 
-                "total phased": 0, "phased by SHAPEIT4": 0, "time elapsed (hours)": 0}
+                "total phased": 0, "phased by SHAPEIT4": 0, 
+                "time elapsed (hours)": 0, 
+                "het phaseable but not phased by SHAPEIT4": 0}
 with open(output_path, "wt") as output:
     output.write("family_id\tvalue\tstage\n")
     for file in glob.glob(f"{input_path}FM_*/trio_phaser_*.out"):
@@ -54,13 +56,21 @@ with open(output_path, "wt") as output:
                     output.write(f"{family_id}\t{incorrectly_phased}\tincorrectly phased by SHAPEIT4\n")
                     stat_summary["incorrectly phased by SHAPEIT4"] += incorrectly_phased
                 
-                # This outputs the number of phasable (by Mendelian inhertiance)
+                # This outputs the number of phaseable (by Mendelian inhertiance)
                 # variants that were not phased by SHAPEIT4 and adds those 
                 # variants to the overall tally in the "stat_summary" dict.
-                if "variants were not phased by shapeit but were phasable" in line:
-                    phasable = int(re.findall(r"(\d+) variants were not phased by shapeit but were phasable and will be included in final output\.", line)[0])
-                    output.write(f"{family_id}\t{phasable}\tphased by Mendelian inheritance\n")
-                    stat_summary["phasable but not phased by SHAPEIT4"] += phasable
+                if "variants were not phased by shapeit but were phaseable" in line:
+                    phaseable = int(re.findall(r"(\d+) variants were not phased by shapeit but were phaseable and will be included in final output\.", line)[0])
+                    output.write(f"{family_id}\t{phaseable}\tphased by Mendelian inheritance\n")
+                    stat_summary["phaseable but not phased by SHAPEIT4"] += phaseable
+
+                # This outputs the number of phaseable het (by Mendelian inhertiance)
+                # variants that were not phased by SHAPEIT4 and adds those 
+                # variants to the overall tally in the "stat_summary" dict.
+                if "variants not phased by shapeit but were phaseable," in line:
+                    het = int(re.findall(r"variants not phased by shapeit but were phaseable, (\d+)", line)[0])
+                    output.write(f"{family_id}\t{het}\thet phased by Mendelian inheritance\n")
+                    stat_summary["het phaseable but not phased by SHAPEIT4"] += het
 
                 # This outputs the number of variants that were phased by 
                 # SHAPEIT4 but were not able to be verified with Mendelian 
@@ -78,7 +88,7 @@ with open(output_path, "wt") as output:
                 # tally in the "stat_summary" dict.
                 if "total variants phased." in line:
                     total_phased = int(re.findall(r"There were (\d+) total variants phased\.", line)[0])
-                    phased_by_shapeit4 = total_phased - phasable
+                    phased_by_shapeit4 = total_phased - phaseable
                     output.write(f"{family_id}\t{total_phased}\ttotal phased with trioPhaser\n")
                     output.write(f"{family_id}\t{phased_by_shapeit4}\tphased by SHAPEIT4\n")
                     stat_summary["total phased"] += total_phased
