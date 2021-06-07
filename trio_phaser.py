@@ -322,6 +322,7 @@ print(
 
 # Extract genetic maps and download haplotype references if necessary
 os.system("tar -xf /shapeit4/maps/genetic_maps.b38.tar.gz -C /shapeit4/maps/")
+os.system("tar -xf /shapeit4/maps/genetic_maps.b37.tar.gz -C /shapeit4/maps/")
 if build_version == 38 \
     and not os.path.exists(f"{haplotype_path}ALL.chr1.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz"):
     os.system("wget --no-check-certificate https://files.osf.io/v1/resources/rbzma/providers/osfstorage/608b8dd719183d00cb5556c3/?zip= -O /haplotype_references.zip")
