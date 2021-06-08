@@ -238,7 +238,7 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
         elif not line.startswith("#") and line.split("\t")[0] not in chromosome_set:
             line_list = line.rstrip("\n").split("\t")
             chrom = line_list[chrom_index]
-            qual = float(line_list[qual])
+            qual = float(line_list[qual_index])
             # Chromosomes are listed as "chr1", this removes the "chr"
             updated_chrom = chrom[3:]
             child_genotype = line_list[child_index].split(":")[0]
