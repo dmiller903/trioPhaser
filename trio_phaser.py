@@ -224,6 +224,7 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
             line_list = line.rstrip("\n").split("\t")
             chrom_index = line_list.index("#CHROM")
             child_index = line_list.index(sample_ids["child"])
+            qual_index = line_list.index("QUAL")
             paternal_index = line_list.index(sample_ids["paternal"])
             maternal_index = line_list.index(sample_ids["maternal"])
             # Recreate the header line with all columns except parental columns
@@ -237,6 +238,7 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
         elif not line.startswith("#") and line.split("\t")[0] not in chromosome_set:
             line_list = line.rstrip("\n").split("\t")
             chrom = line_list[chrom_index]
+            qual = int(line_list[qual])
             # Chromosomes are listed as "chr1", this removes the "chr"
             updated_chrom = chrom[3:]
             child_genotype = line_list[child_index].split(":")[0]
@@ -250,7 +252,8 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
             with gzip.open(f"{output_name}_{chrom}.vcf", "wb") as chromosome, \
                 gzip.open(f"{output_name}_{chrom}_scaffold.vcf", "wb") as scaffold:
                 chromosome.write(header_chromosome.encode())
-                if "." not in child_genotype and "." not in paternal_genotype \
+                if qual >= 30 and "." not in child_genotype \
+                and "." not in paternal_genotype \
                 and "." not in maternal_genotype and (child_genotype != "0/0" \
                     or child_genotype != "0|0"):
                     chromosome.write(line.encode())
@@ -268,7 +271,7 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
                 
                 phase = get_phase(child_allele_1, child_allele_2, 
                                 paternal_genotype, maternal_genotype)
-                if phase != "." and phase != "0|0":
+                if phase != "." and phase != "0|0" and qual >= 30:
                     line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
 

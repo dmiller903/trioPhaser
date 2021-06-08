@@ -66,11 +66,9 @@ with open(whatshap_file, "rt") as long_ranger:
             sample_index = line_list.index("21228")
         else:
             line_list = line.rstrip("\n").split("\t")
-            chrom = line_list[chrom_index]
-            pos = line_list[pos_index]
-            ref = line_list[ref_index]
-            alt = line_list[alt_index]
-            qual = line_list[qual_index]
+            chrom, pos, ref, alt, qual = get_header_info(line_list, chrom_index, 
+                                                        pos_index, ref_index, 
+                                                        alt_index, qual_index)
             sample_column = line_list[sample_index]
             haplotype = sample_column[0:3]
             sample_columnList = sample_column.split(":")
@@ -79,14 +77,14 @@ with open(whatshap_file, "rt") as long_ranger:
                     and "|" in haplotype \
                     and "." not in haplotype \
                     and qual != "." \
-                    and float(qual) >= 20:
+                    and float(qual) >= 30:
                     whatshap_total_variants += 1
                     haplotype_dict[chrom] = {pos: [ref, alt, haplotype]}
                 elif chrom in haplotype_dict \
                     and "|" in haplotype \
                     and "." not in haplotype \
                     and qual != "." \
-                    and float(qual) >= 20:
+                    and float(qual) >= 30:
                     whatshap_total_variants += 1
                     haplotype_dict[chrom][pos] = [ref, alt, haplotype]
 
