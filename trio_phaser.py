@@ -30,6 +30,8 @@ parser.add_argument('--number_of_tasks', help='Max number of cores that can be \
     runtime.', default="2")
 parser.add_argument('--build_version', help='GRCh 37 or 38 are supported. GRCh38\
     is used as default.', default='38')
+parser.add_argument('--call_quality', help='Minimum Phred-scaled quality score \
+    a nucleotide position is able to have', default='30')
 
 args = parser.parse_args()
 
@@ -39,6 +41,8 @@ paternal_file = args.paternal_file
 maternal_file = args.maternal_file
 output_file = args.output_file
 haplotype_path = args.haplotype_reference_files
+call_quality = float(args.call_quality)
+
 if not haplotype_path.endswith("/"):
     haplotype_path = haplotype_path + "/"
 number_tasks = int(args.number_of_tasks)
@@ -209,6 +213,7 @@ elif build_version == 37:
 
 # Separate combined trio file by chromosome and create child scaffold 
 # (phased VCF) for each chromosome
+total_het = 0
 with gzip.open(temp_genotyped_name, "rt") as vcf:
     output_name = f"/tmp/genotyped"
     chromosome_set = set()
@@ -247,16 +252,19 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
             child_allele_1 = child_genotype[0]
             child_allele_2 = child_genotype[-1]
             line = line.replace(chrom, updated_chrom)
-            # output metadata to output chromosome and first genotype line if
+            # output metadata to output chromosome and first genotyped line if
             # there is no missing genotype data
             with gzip.open(f"{output_name}_{chrom}.vcf", "wb") as chromosome, \
                 gzip.open(f"{output_name}_{chrom}_scaffold.vcf", "wb") as scaffold:
                 chromosome.write(header_chromosome.encode())
-                if qual >= 30.0 and "." not in child_genotype \
+                if qual >= call_quality and "." not in child_genotype \
                 and "." not in paternal_genotype \
                 and "." not in maternal_genotype and (child_genotype != "0/0" \
                     or child_genotype != "0|0"):
                     chromosome.write(line.encode())
+                    # keep track of total het
+                    if child_allele_1 != child_allele_2:
+                        total_het += 1
                 
                 # Outputs phaseable positions to the output scaffold
                 new_line_list = []
@@ -266,21 +274,26 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
                 line_list = new_line_list
                 line = "\t".join(line_list) + "\n"
                 line = line.replace(chrom, updated_chrom)
-                scaffold.write(header_scaffold.encode())
-                chromosome_set.add(chrom)
                 
                 phase = get_phase(child_allele_1, child_allele_2, 
                                 paternal_genotype, maternal_genotype)
-                if phase != "." and phase != "0|0" and qual >= 30.0:
+
+                scaffold.write(header_scaffold.encode())
+                if phase != "." and phase != "0|0" and qual >= call_quality:
                     line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
 
-                # Make a list of file names for SHAPEIT4 input
-                file_list_to_bgzip.append(f"{output_name}_{chrom}.vcf")
-                file_list_to_bgzip.append(f"{output_name}_{chrom}_scaffold.vcf")
+            # Make a list of file names for SHAPEIT4 input
+            file_list_to_bgzip.append(f"{output_name}_{chrom}.vcf")
+            file_list_to_bgzip.append(f"{output_name}_{chrom}_scaffold.vcf")
+            
+            # Add chromosome to chromosome set so this section of code is not
+            # repeated
+            chromosome_set.add(chrom)
         
         elif not line.startswith("#") and line.split("\t")[0] in chromosome_set:
             line_list = line.rstrip("\n").split("\t")
+            qual = float(line_list[qual_index])
             chrom = line_list[chrom_index]
             updated_chrom = chrom[3:]
             child_genotype = line_list[child_index].split(":")[0]
@@ -291,11 +304,14 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
             line = line.replace(chrom, updated_chrom)
             # Output line to chromosome file if no missing genotypes are found
             with gzip.open(f"{output_name}_{chrom}.vcf", "ab") as chromosome:
-                if qual >= 30.0 and "." not in child_genotype \
+                if qual >= call_quality and "." not in child_genotype \
                 and "." not in paternal_genotype \
                 and "." not in maternal_genotype and (child_genotype != "0/0" \
                     or child_genotype != "0|0"):
                     chromosome.write(line.encode())
+                    # keep track of total het
+                    if child_allele_1 != child_allele_2:
+                        total_het += 1
             # Phase child using Mendelian inheritance, output haplotype to 
             # scaffold file
             with gzip.open(f"{output_name}_{chrom}_scaffold.vcf", "ab") as scaffold:
@@ -310,7 +326,7 @@ with gzip.open(temp_genotyped_name, "rt") as vcf:
                 phase = get_phase(child_allele_1, child_allele_2, 
                                 paternal_genotype, maternal_genotype)
                 # Outputs phaseable positions to the output scaffold
-                if phase != "." and phase != "0|0" and qual >= 30.0:
+                if phase != "." and phase != "0|0" and qual >= call_quality:
                     line = line.replace(child_genotype, phase)
                     scaffold.write(line.encode())
 
@@ -364,6 +380,7 @@ incorrectly_phased = 0
 total_variants = 0
 total_phased = 0
 could_not_be_determined = 0
+mendel_het = 0
 header = ""
 header_written = False
 with gzip.open(output_file.replace('.vcf.gz', \
@@ -412,12 +429,18 @@ with gzip.open(output_file.replace('.vcf.gz', \
                             correctly_phased += 1
                             line = "\t".join(line_list) + "\n"
                             shapeit_positions[chrom][pos] = line
+                            # keep track of mendel het
+                            if child_allele_1 != child_allele_2:
+                                mendel_het += 1
                         elif phase != child_haplotype and phase != ".":
                             incorrectly_phased += 1
                             incorrectly_phased_out.write(line.encode())
                             line_list[child_index] = phase
                             line = "\t".join(line_list) + "\n"
                             shapeit_positions[chrom][pos] = line
+                            # keep track of mendel het
+                            if child_allele_1 != child_allele_2:
+                                mendel_het += 1
                         else:
                             could_not_be_determined += 1
                             line = "\t".join(line_list) + "\n"
@@ -474,6 +497,7 @@ for i in range(1, 23):
                             shapeit_positions[chrom][pos] = line
                             if child_allele_1 != child_allele_2:
                                 not_in_shapeit_het +=1
+                                mendel_het += 1
 
 # Print summary statistics.
 print(f"\nThere were {correctly_phased} ({(correctly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) correctly phased haplotypes, and {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + incorrectly_phased)) * 100:.5f}%) incorrectly phased haplotypes. (as phased by SHAPEIT4)\n")
@@ -481,6 +505,7 @@ print(f"The {incorrectly_phased} ({(incorrectly_phased / (correctly_phased + inc
 print(f"{not_in_shapeit} variants were not phased by shapeit but were phaseable and will be included in final output.\n")
 print(f"Of the {not_in_shapeit} variants not phased by shapeit but were phaseable, {not_in_shapeit_het} ({(not_in_shapeit_het / not_in_shapeit) * 100:.5f}%) were heterozygous.\n")
 print(f'{could_not_be_determined} phased variants (as phased by SHAPEIT4) could not be verified by using Mendelian inheritance alone.\n')
+print(f'There were {mendel_het} out of {total_het} ({(mendel_het / total_het) * 100:.5f}%) heterozygous variants that were able to be phased using Mendelian inheritance logic.\n')
 print(f"There were {total_phased} total variants phased.\n")
 print(f"There were {total_variants} total variants prior to any phasing.\n")
 
