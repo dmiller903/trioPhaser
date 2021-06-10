@@ -51,12 +51,12 @@ def nucleotide_based_haplotype(input_list, ref_allele, alt_allele_list):
     temp_haplotype = "|".join(temp_list)
     return(temp_haplotype)
 
-# Create a dictionary of all positions phased by whatshap Long Ranger with a 
-# quality >= 20.
+# Create a dictionary of all positions phased by whatshap with a 
+# quality >= 30.
 haplotype_dict = {}
 whatshap_total_variants = 0
-with open(whatshap_file, "rt") as long_ranger:
-    for line in long_ranger:
+with open(whatshap_file, "rt") as whatshap:
+    for line in whatshap:
         if line.startswith("##"):
             continue
         elif line.startswith("#CHROM"):
@@ -112,7 +112,6 @@ with gzip.open(trioPhaser_file, "rt") as trio_phaser:
             paternal_index = line_list.index("21230")
             maternal_index = line_list.index("21229")
         else:
-            trio_phaser_total_phased += 1
             line_list = line.rstrip("\n").split("\t")
             chrom, pos, ref, alt, qual = get_header_info(line_list, chrom_index, 
                                                         pos_index, ref_index, 
@@ -162,27 +161,15 @@ with gzip.open(trioPhaser_file, "rt") as trio_phaser:
             else:
                 phase = "."
 
-            if phase != ".":
+            if phase != "." and child_allele_1 != child_allele_2:
                 mendelian_phased_total += 1
+                trio_phaser_total_phased += 1
                 if chrom not in mendelian_phasable:
                     mendelian_phasable[chrom] = set(pos)
                 else:
                     mendelian_phasable[chrom].add(pos)
-            
-            if pos in haplotype_dict[chrom]:
-                ref_whatshap = haplotype_dict[chrom][pos][0]
-                alt_whatshap = haplotype_dict[chrom][pos][1]
-                alt_whatshap_list = alt_whatshap.split(",")
-                haplotype_whatshap = haplotype_dict[chrom][pos][-1]
-                haplotype_whatshap_list = haplotype_whatshap.split("|")
-                
-                # Get a nucleotide-based haplotype instead of a numeric-based 
-                # haplotype for the whatshap data.
-                new_haplotype_whatshap = nucleotide_based_haplotype(haplotype_whatshap_list, ref_whatshap, alt_whatshap_list)
-
-                # Get a nucleotide-based haplotype instead of a numeric-based 
-                # haplotype for the trio_phaser data.
-                new_haplotype = nucleotide_based_haplotype(haplotype_list, ref, alt_list)
+            elif phase == "." and child_allele_1 != child_allele_2:
+                trio_phaser_total_phased += 1
 
 phased_incorrectly_by_whatshap = {}
 with gzip.open(trioPhaser_file, "rt") as trio_phaser, \
@@ -250,9 +237,10 @@ with gzip.open(trioPhaser_file, "rt") as trio_phaser, \
                 elif f"{new_haplotype_whatshap.split('|')[-1]}|{new_haplotype_whatshap.split('|')[0]}" != new_haplotype \
                     and new_haplotype_whatshap != new_haplotype:
                     different_calls += 1
-            else:
-                unique_to_trio_phaser.write(line.encode())
-                phased_but_not_in_whatshap += 1
+            elif pos not in haplotype_dict[chrom]:
+                if haplotype_list[0] != haplotype_list[-1]:
+                    unique_to_trio_phaser.write(line.encode())
+                    phased_but_not_in_whatshap += 1
 
 with open(whatshap_file, "rt") as input, \
     gzip.open(f"{output_path}mendelian_phased_incorrectly_by_whatshap.vcf.gz", "wb") as mendelian_out:
