@@ -24,7 +24,8 @@ stat_summary = {"initial variants": 0, "correctly phased by SHAPEIT4": 0,
                 "phased by SHAPEIT4 but could not be verified": 0, 
                 "total phased": 0, "phased by SHAPEIT4": 0, 
                 "time elapsed (hours)": 0, 
-                "het phaseable but not phased by SHAPEIT4": 0}
+                "het phaseable but not phased by SHAPEIT4": 0,
+                "percent het phased": 0}
 with open(output_path, "wt") as output:
     output.write("family_id\tvalue\tstage\n")
     for file in glob.glob(f"{input_path}FM_*/trio_phaser_*.out"):
@@ -71,6 +72,13 @@ with open(output_path, "wt") as output:
                     het = int(re.findall(r"variants not phased by shapeit but were phaseable, (\d+)", line)[0])
                     output.write(f"{family_id}\t{het}\thet phased by Mendelian inheritance\n")
                     stat_summary["het phaseable but not phased by SHAPEIT4"] += het
+
+                # This outputs the percent of heterozygous positions that were
+                # phaseable using Mendelian inheritance logic.
+                if "heterozygous variants that were able to be phased using Mendelian inheritance logic." in line:
+                    het_percent = float(re.findall(r"There were \d+ out of \d+ \((\d+\.\d+)%\) heterozygous variants", line)[0])
+                    output.write(f"{family_id}\t{het}\tpercent het phased\n")
+                    stat_summary["percent het phased"] += het_percent
 
                 # This outputs the number of variants that were phased by 
                 # SHAPEIT4 but were not able to be verified with Mendelian 
