@@ -23,7 +23,7 @@ Mendelian inheritance logic in conjunction with *SHAPEIT4* [insert manuscript do
 
 ## Installation (requires [Docker installation](https://docs.docker.com/desktop/))
 ```
-docker pull dmill903/triophaser:1.0
+docker pull dmill903/triophaser:latest
 ```
 ## Run trioPhaser on the included example data (see [here](https://github.com/dmiller903/trioPhaser/blob/main/validate/validate.pdf) for how we generated the files and for more details on how to run trioPhaser)
 Here we provide example code on how to execute trioPhaser. In this example, 
@@ -44,11 +44,11 @@ on your local machine. For example, if you want the output to be stored at
 `/tmp` and within `/tmp` you have a folder called `references`, you would 
 change `/Data` to `/tmp` and `haplotype_references` to `references`.
 
-Use `docker run -t dmill903/triophaser:1.0 python3 /trio_phaser.py -h`
+Use `docker run -t dmill903/triophaser:latest python3 /trio_phaser.py -h`
 learn more about trioPhaser's arguments.
 
 ```ignore
-docker run -d -v /Data:/proj -w /proj -t dmill903/triophaser:1.0 \
+docker run -d -v /Data:/proj -w /proj -t dmill903/triophaser:latest \
   python3 /trio_phaser.py \
   /trioPhaser/validate/son_GRCh38_chr22.g.vcf.gz \
   /trioPhaser/validate/father_GRCh38_chr22.g.vcf.gz \
