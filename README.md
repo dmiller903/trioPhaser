@@ -1,6 +1,6 @@
 # trioPhaser: Using Mendelian inheritance logic to improve genomic phasing of trios.
 Mendelian inheritance logic can be used to determine phase for the majority 
-(~69%) of variant nucleotide positions. However, when both parents and the 
+(67-83%) of variant nucleotide positions. However, when both parents and the 
 child are heterozygotic (A/G), Mendelian inheritance alone cannot be used to
 determine phase. When such scenarios are present, phasing programs that rely on
 population-based haplotype reference panels can be used.
@@ -12,7 +12,7 @@ current genome builds. To address these challenges, we have developed
 trioPhaser. 
 
 trioPhaser can increase the total number of correctly phased positions by using
-Mendelian inheritance logic and *SHAPEIT4* [insert manuscript doi here].
+Mendelian inheritance logic in conjunction with *SHAPEIT4* [insert manuscript doi here].
 
 # Usage
 <a href="https://drive.google.com/uc?export=view&id=1dTeQElTs6LzR9Z4u2WdO1v67DVfAPute">
