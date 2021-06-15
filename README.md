@@ -1,9 +1,10 @@
 # trioPhaser: Using Mendelian inheritance logic to improve genomic phasing of trios.
 Mendelian inheritance logic can be used to determine phase for the majority 
-(67-83%) of variant nucleotide positions. However, when both parents and the 
-child are heterozygotic (A/G), Mendelian inheritance alone cannot be used to
-determine phase. When such scenarios are present, phasing programs that rely on
-population-based haplotype reference panels can be used.
+(67-83%) of variant nucleotide positions (Choi et al. 2018 & Roach et al. 2011). 
+However, when both parents and the  child are heterozygotic (A/G), Mendelian 
+inheritance alone cannot be used to determine phase. When such scenarios are 
+present, phasing programs that rely on population-based haplotype reference 
+panels can be used.
 
 Available software that directly uses trios and Mendelian inheritance logic 
 during phasing have limitations. For example, some software require multiple 
@@ -67,3 +68,11 @@ cached reference files.*
 CONTAINERID="cat /Data/trio_phaser.out"
 docker logs `$CONTAINERID` >> /Data/trio_phaser.out
 ```
+
+## References
+Choi Y, Chan AP, Kirkness E, Telenti A, Schork NJ: Comparison of phasing 
+  strategies for whole human genomes. PLoS Genet. 2018, 14:e1007308.
+
+Roach JC, Glusman G, Hubley R, Montsaroff SZ, Holloway AK, Mauldin DE, Srivastava D, 
+  Garg V, Pollard KS, Galas DJ, Hood L, Smit AFA: Chromosomal haplotypes by 
+  genetic phasing of human families. Am. J. Hum. Genet. 2011, 89:382–397.
