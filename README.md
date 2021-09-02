@@ -46,16 +46,17 @@ on your local machine. For example, if you want the output to be stored at
 change `/Data` to `/tmp` and `haplotype_references` to `references`.
 
 Use `docker run -t dmill903/triophaser:latest python3 /trio_phaser.py -h`
-learn more about trioPhaser's arguments.
+learn more about trioPhaser's arguments and how multiple trios can be used
+as input.
 
 ```ignore
 docker run -d -v /Data:/proj -w /proj -t dmill903/triophaser:latest \
   python3 /trio_phaser.py \
-  /trioPhaser/validate/son_GRCh38_chr22.g.vcf.gz \
-  /trioPhaser/validate/father_GRCh38_chr22.g.vcf.gz \
-  /trioPhaser/validate/mother_GRCh38_chr22.g.vcf.gz \
-  /proj/phased_output.vcf.gz \
-  /proj/haplotype_references \
+  -c /trioPhaser/validate/son_ashkenazim_GRCh38_chr22.g.vcf.gz \
+  -p /trioPhaser/validate/father_ashkenazim_GRCh38_chr22.g.vcf.gz \
+  -m /trioPhaser/validate/mother_ashkenazim_GRCh38_chr22.g.vcf.gz \
+  -o /proj/phased_output.vcf.gz \
+  -r /proj/haplotype_references \
   > /Data/trio_phaser.out
 ```
 
