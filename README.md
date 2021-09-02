@@ -1,4 +1,4 @@
-# trioPhaser: Using Mendelian inheritance logic to improve genomic phasing of trios.
+# trioPhaser: Using Mendelian inheritance logic to improve genomic phasing of trios
 Mendelian inheritance logic can be used to determine phase for the majority 
 (67-83%) of variant nucleotide positions (Choi et al. 2018 & Roach et al. 2011). 
 However, when both parents and the  child are heterozygotic (A/G), Mendelian 
