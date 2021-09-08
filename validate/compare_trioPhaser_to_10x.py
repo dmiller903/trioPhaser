@@ -64,7 +64,10 @@ with gzip.open(tenX_file, "rt") as long_ranger:
             line_list = line.rstrip("\n").split("\t")
             chrom_index, pos_index, ref_index, \
             alt_index, qual_index = get_header_indexes(line_list)
-            sample_index = line_list.index("21228")
+            if "21228" in line:
+                sample_index = line_list.index("21228")
+            elif "38536" in line:
+                sample_index = line_list.index("38536")
         else:
             line_list = line.rstrip("\n").split("\t")
             chrom, pos, ref, alt, qual = get_header_info(line_list, chrom_index, 
@@ -114,9 +117,15 @@ with gzip.open(trioPhaser_file, "rt") as trio_phaser:
             line_list = line.rstrip("\n").split("\t")
             chrom_index, pos_index, ref_index, \
             alt_index, qual_index = get_header_indexes(line_list)
-            sample_index = line_list.index("21228")
-            paternal_index = line_list.index("21230")
-            maternal_index = line_list.index("21229")
+            if "21228" in line:
+                sample_index = line_list.index("21228")
+                paternal_index = line_list.index("21230")
+                maternal_index = line_list.index("21229")
+            elif "38536" in line:
+                sample_index = line_list.index("38536")
+                paternal_index = line_list.index("38535")
+                maternal_index = line_list.index("38534")
+            
         else:
             trio_phaser_total_phased += 1
             line_list = line.rstrip("\n").split("\t")
@@ -222,7 +231,10 @@ with gzip.open(trioPhaser_file, "rt") as trio_phaser, \
             line_list = line.rstrip("\n").split("\t")
             chrom_index, pos_index, ref_index, \
             alt_index, qual_index = get_header_indexes(line_list)
-            sample_index = line_list.index("21228")
+            if "21228" in line:
+                sample_index = line_list.index("21228")
+            elif "38536" in line:
+                sample_index = line_list.index("38536")
             output.write("chrom\tpos\t10x\tphase_set_value\ttrio_phaser\n")
             unique_to_trio_phaser.write(line.encode())
             phased_out.write(line.encode())
