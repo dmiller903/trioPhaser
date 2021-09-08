@@ -262,6 +262,7 @@ elif build_version == 37 \
 
 # Iterate through each trio and phase
 for trio_list in trio_nested_list:
+    current_time = time.time()
     child_file, paternal_file, maternal_file, output_file = trio_list
 
     # Create a dictionary where the key is the family members title, and 
@@ -276,23 +277,32 @@ for trio_list in trio_nested_list:
     # for the child
     position_dict = {} #The dictionary that filter_child() will use
     filter_child(child_file)
-    print("Variant-only positions of the child have been written to a"
-            " temporary file.")
 
+    timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+
+    print(f"Variant-only positions of the child have been written to a"
+            f" temporary file. Time elapsed: {timeElapsedMinutes} minutes")
+
+    current_time = time.time()
     # Output a temporary file for each parent that has positions that occur 
     # as variant-only positions in the child
     with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) \
         as executor:
         executor.map(filter_parents, [paternal_file, maternal_file])
-
+    timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+    print(f"Positions of each parent that correspond to variant-only positions of"
+        f" child have been output to temporary file. Time elapsed: {timeElapsedMinutes} minutes.")
     # Use GATK to combine all trios into one temporary vcf and then genotype 
     # the combined trio vcf
+    current_time = time.time()
+
     files = ["/tmp/child_parsed.vcf.gz", "/tmp/paternal_parsed.vcf.gz", 
             "/tmp/maternal_parsed.vcf.gz"]
     temp_combined_name = "/tmp/combined.vcf.gz"
     temp_genotyped_name = "/tmp/genotyped.vcf.gz"
 
     # Use GATK to combine the trio into a single file and then create a gVCF
+    current_time = time.time()
     file_string = ""
     for file in files:
         file_string += f"-V {file} "
@@ -301,24 +311,37 @@ for trio_list in trio_nested_list:
     if build_version == 38:
         os.system(f"gatk CombineGVCFs -R /fasta_references/"
         f"Homo_sapiens_assembly38.fasta {file_string} -O {temp_combined_name}")
-        print("Trio has been combined and written to a temporary file.")
+        timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+        print(f"Trio has been combined and written to a temporary file."
+                f" Time elapsed: {timeElapsedMinutes} minutes.")
+
+        current_time = time.time()
         os.system(f"gatk IndexFeatureFile -F {temp_combined_name}")
         os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs"
         f" -R /fasta_references/Homo_sapiens_assembly38.fasta"
         f" -V {temp_combined_name} -O {temp_genotyped_name}")
-        print("Trio has been joint-genotyped.")
+        timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+        print(f"Trio has been join-genotyped."
+                f" Time elapsed: {timeElapsedMinutes} minutes.")
     elif build_version == 37:
         os.system(f"gatk CombineGVCFs -R /fasta_references/"
         f"human_g1k_v37_modified.fasta {file_string} -O {temp_combined_name}")
-        print("Trio has been combined and written to a temporary file.")
+        timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+        print(f"Trio has been combined and written to a temporary file."
+                f" Time elapsed: {timeElapsedMinutes} minutes.")
+        
+        current_time = time.time()
         os.system(f"gatk IndexFeatureFile -F {temp_combined_name}")
         os.system(f"gatk --java-options '-Xmx4g' GenotypeGVCFs"
         f" -R /fasta_references/human_g1k_v37_modified.fasta"
         f" -V {temp_combined_name} -O {temp_genotyped_name}")
-        print("Trio has been joint-genotyped.")
-
+        timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+        print(f"Trio has been joint-genotyped."
+                f" Time elapsed: {timeElapsedMinutes} minutes.")
+    
     # Separate combined trio file by chromosome and create child scaffold 
     # (phased VCF) for each chromosome
+    current_time = time.time()
     total_het = 0
     with gzip.open(temp_genotyped_name, "rt") as vcf:
         output_name = f"/tmp/genotyped"
@@ -447,9 +470,11 @@ for trio_list in trio_nested_list:
         bgzip_file(file)
         os.system(f"tabix -fp vcf {file}.gz")
         os.system(f"bcftools index {file}.gz")
-        
-    print("Trio has been separated into chromosome files and chromosome "
-        "scaffolds have been created in preparation for phasing.")
+
+    timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+    print(f"Trio has been separated into chromosome files and chromosome"
+        f" scaffolds have been created in preparation for phasing."
+        f" Time elapsed: {timeElapsedMinutes} minutes.")
 
     # Create a list of shapeit4 execution commands.
     task_list = []
@@ -476,12 +501,16 @@ for trio_list in trio_nested_list:
 
     # Phase with shapeit4, using concurrent.futures to phase all chromosomes 
     # at once.
+    current_time = time.time()
     with concurrent.futures.ProcessPoolExecutor(max_workers=number_tasks) \
         as executor:
         executor.map(os_system_task, task_list)
-
+    timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+    print(f"shapeit4 phasing complete."
+            f" Time elapsed: {timeElapsedMinutes} minutes.")
     # Iterate through the phased file and determine if SHAPEIT4 phased the 
     # positions correctly that can be phased using Mendelian inheritance.
+    current_time = time.time()
     shapeit_positions = {}
     correctly_phased = 0
     incorrectly_phased = 0
@@ -555,10 +584,14 @@ for trio_list in trio_nested_list:
                                 could_not_be_determined += 1
                                 line = "\t".join(line_list) + "\n"
                                 shapeit_positions[chrom][pos] = line
+    timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+    print(f"Iteration through shapeit4 output complete."
+            f" Time elapsed: {timeElapsedMinutes} minutes.")
 
     # Iterate through the genotyped file and if the position was not phased by 
     # SHAPEIT4, determine if it's phaseable and if it is, put it in the final 
     # output. Also detect Mendel inheritance errors and output file.
+    current_time = time.time()
     not_in_shapeit = 0
     not_in_shapeit_het = 0
     mendel_errors = 0
@@ -627,6 +660,9 @@ for trio_list in trio_nested_list:
                                 and child_allele_2 not in maternal_genotype):
                                 mendel_error.write(shapeit_positions[chrom][pos])
                                 mendel_errors += 1
+    timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+    print(f"Mendelian Positions added back in."
+            f" Time elapsed: {timeElapsedMinutes} minutes.")
 
     # Print summary statistics.
     print(f"\nThere were {correctly_phased}"
@@ -655,12 +691,15 @@ for trio_list in trio_nested_list:
     print(f"There were {total_variants} total variants prior to any phasing.\n")
 
     # Output the final file.
+    current_time = time.time()
     with gzip.open(output_file.replace(".gz", ""), "wb") as output:
         output.write(header.encode())
         for chrom, posDict in sorted(shapeit_positions.items()):
             for pos, line in sorted(posDict.items()):
                 output.write(line.encode())
-
+    
+    
+    
     # bgZip and index final file.
     os.system(f"zcat {output_file.replace('.gz', '')} | bgzip -f > {output_file}")
     os.system(f"tabix -fp vcf {output_file}")
@@ -668,6 +707,9 @@ for trio_list in trio_nested_list:
     os.system(f"chmod 777 {output_file} {output_file}.tbi {output_file}.csi")
     os.system(f"rm {output_file.replace('.gz', '')}")
     print(f"\nPhased output file written as {output_file}\n")
+    timeElapsedMinutes = round((time.time()-current_time) / 60, 2)
+    print(f"Outputfile written, compressed and indexed."
+            f" Time elapsed: {timeElapsedMinutes} minutes.")
 
 # Print message and how long the previous steps took.
 timeElapsedMinutes = round((time.time()-start_time) / 60, 2)
