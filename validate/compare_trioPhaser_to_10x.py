@@ -374,5 +374,5 @@ print(f"There were {phased_correctly + phased_incorrectly} phased variants that 
 print(f"There were {phased_correctly} ({(phased_correctly / (phased_correctly + phased_incorrectly)) * 100}%) variants phased the same between 10X and trio_phaser")
 print(f"There were {phased_but_not_in_10X} variants phased through trio_phaser that were not phased in 10X")
 print(f'There were {different_calls} variants that were genotyped differently between 10X and GATK')
-print(f'{mendelian_phased} {100 - ((mendelian_phased_wrong / mendelian_phased_total) * 100)}% of the Mendelian variants were phased correctly by 10X.')
+print(f'{mendelian_phased} {100 - ((mendelian_phased_wrong / (mendelian_phased + mendelian_phased_wrong)) * 100)}% of the Mendelian variants were phased correctly by 10X.')
 print(f'There were {mendelian_phased_wrong} Mendelian variants that were incorrectly phased by 10X.')
