@@ -13,7 +13,7 @@ apt-get update \
   unzip=6.0-21ubuntu1.1 \
   zip=3.0-11build1 \
   tar=1.29b-2ubuntu0.2 \
-  git=1:2.17.1-1ubuntu0.8 \
+  git=1:2.17.1-1ubuntu0.9 \
   # Install miniconda2 and config channels
   && wget --no-check-certificate https://repo.anaconda.com/miniconda/Miniconda3-py38_4.9.2-Linux-x86_64.sh \
   && bash Miniconda3-py38_4.9.2-Linux-x86_64.sh -b -p \
